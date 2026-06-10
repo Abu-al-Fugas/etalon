@@ -1,0 +1,16 @@
+{
+  "name": "ООО Эталон Стандарт",
+  "short_name": "Эталон Стандарт",
+  "description": "Приложение для фотоотчетов ООО Эталон Стандарт",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#2b7a4b",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
