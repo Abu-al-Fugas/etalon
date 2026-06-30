@@ -171,7 +171,7 @@
     </div>
   </div>
 
-  <footer>ООО Эталон Стандарт | Версия 1.5 (PWA)</footer>
+  <footer>ООО Эталон Стандарт | Версия 1.6 (PWA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -187,13 +187,23 @@
     navigator.serviceWorker.register('sw.js').then(() => console.log('PWA Offline Ready'));
   }
 
-  // Настройка базы данных Локальных Архивов (IndexedDB для iOS)
+  // Настройка базы данных (IndexedDB)
+  // Версия повышена до 2, чтобы создать новое хранилище для черновика
   let db;
-  const dbRequest = indexedDB.open("EtalonPWA_DB", 1);
+  const dbRequest = indexedDB.open("EtalonPWA_DB", 2);
   dbRequest.onupgradeneeded = (e) => {
-    e.target.result.createObjectStore("archives", { keyPath: "name" });
+    const database = e.target.result;
+    if (!database.objectStoreNames.contains("archives")) {
+      database.createObjectStore("archives", { keyPath: "name" });
+    }
+    if (!database.objectStoreNames.contains("drafts")) {
+      database.createObjectStore("drafts", { keyPath: "id" });
+    }
   };
-  dbRequest.onsuccess = (e) => { db = e.target.result; };
+  dbRequest.onsuccess = (e) => { 
+    db = e.target.result; 
+    checkDraft(); // При запуске проверяем наличие незаконченного отчета
+  };
 
   const mandatoryConfig = [
     { title: "🏢 Общий вид объекта (здания)", prefix: "01_building" },
@@ -222,6 +232,93 @@
     if (savedName) document.getElementById('installerName').value = savedName;
   });
 
+  // Логика автосохранения (Черновики)
+  function saveDraft() {
+    if (!db) return;
+    const draftState = {
+      objectName: state.objectName,
+      address: state.address,
+      installerName: state.installerName,
+      serialNumber: state.serialNumber,
+      comment: state.comment,
+      coordinates: state.coordinates,
+      creationDate: state.creationDate,
+      // Сохраняем только blob файлов, так как previewUrl уничтожаются при закрытии
+      photos: state.photos.map(arr => arr.map(p => ({ blob: p.blob, timestamp: p.timestamp })))
+    };
+    const tx = db.transaction("drafts", "readwrite");
+    tx.objectStore("drafts").put({ id: "current", data: draftState });
+  }
+
+  function clearDraft() {
+    if (db) {
+      const tx = db.transaction("drafts", "readwrite");
+      tx.objectStore("drafts").delete("current");
+    }
+  }
+
+  function checkDraft() {
+    if (!db) return;
+    const tx = db.transaction("drafts", "readonly");
+    const req = tx.objectStore("drafts").get("current");
+    req.onsuccess = (e) => {
+      const result = e.target.result;
+      if (result && result.data) {
+        const d = result.data;
+        
+        state.objectName = d.objectName || '';
+        state.address = d.address || '';
+        state.installerName = d.installerName || '';
+        state.serialNumber = d.serialNumber || '';
+        state.comment = d.comment || '';
+        state.coordinates = d.coordinates || null;
+        state.creationDate = d.creationDate || null;
+
+        document.getElementById('objectName').value = state.objectName;
+        document.getElementById('address').value = state.address;
+        document.getElementById('installerName').value = state.installerName;
+        document.getElementById('serialNumber').value = state.serialNumber;
+        document.getElementById('comment').value = state.comment;
+
+        if (d.photos) {
+          state.photos = d.photos.map(arr => arr.map(p => ({
+            blob: p.blob,
+            timestamp: p.timestamp,
+            previewUrl: URL.createObjectURL(p.blob) // Заново создаем превью для отображения
+          })));
+        }
+
+        // Если дата создания уже есть, значит монтажник уже был на экране чеклиста
+        if (state.creationDate) {
+          formScreen.classList.add('hidden');
+          checklistScreen.classList.remove('hidden');
+          document.getElementById('displayObject').innerText = state.objectName;
+          document.getElementById('displayAddress').innerText = state.address;
+          document.getElementById('displayInstaller').innerText = state.installerName;
+          document.getElementById('displaySerial').innerText = state.serialNumber;
+          
+          if (state.coordinates && !state.coordinates.error) {
+            displayCoords.className = "geo-status-badge geo-success";
+            displayCoords.innerText = `${state.coordinates.lat.toFixed(6)}, ${state.coordinates.lng.toFixed(6)} (~${Math.round(state.coordinates.acc)}м)`;
+          } else if (state.coordinates && state.coordinates.error) {
+            displayCoords.className = "geo-status-badge geo-error";
+            displayCoords.innerText = state.coordinates.error;
+          }
+          
+          renderChecklist();
+        }
+      }
+    };
+  }
+
+  // Обновляем состояние при любом вводе текста, чтобы сразу сохранять черновик
+  ['objectName', 'address', 'installerName', 'serialNumber', 'comment'].forEach(id => {
+    document.getElementById(id).addEventListener('input', (e) => {
+      state[id] = e.target.value.trim();
+      saveDraft();
+    });
+  });
+
   function formatDateTime(isoString) { if (!isoString) return '—'; const d = new Date(isoString); return d.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}); }
 
   function startBackgroundGeoCollection() {
@@ -230,6 +327,7 @@
     navigator.geolocation.getCurrentPosition((pos) => {
       state.coordinates = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
       displayCoords.className = "geo-status-badge geo-success"; displayCoords.innerText = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (~${Math.round(pos.coords.accuracy)}м)`;
+      saveDraft(); // Сохраняем геоданные в черновик
     }, () => { displayCoords.className = "geo-status-badge geo-error"; displayCoords.innerText = "Включите GPS в настройках Safari."; }, { enableHighAccuracy: true, timeout: 10000 });
   }
 
@@ -239,7 +337,10 @@
     localStorage.setItem('installerName', state.installerName);
     formScreen.classList.add('hidden'); checklistScreen.classList.remove('hidden');
     document.getElementById('displayObject').innerText = state.objectName; document.getElementById('displayAddress').innerText = state.address; document.getElementById('displayInstaller').innerText = state.installerName; document.getElementById('displaySerial').innerText = state.serialNumber;
-    state.creationDate = new Date().toISOString(); startBackgroundGeoCollection(); renderChecklist();
+    state.creationDate = new Date().toISOString(); 
+    saveDraft(); // Сохраняем переход на второй экран
+    startBackgroundGeoCollection(); 
+    renderChecklist();
   });
 
   function renderChecklist() {
@@ -273,7 +374,16 @@
           const canvas = document.createElement('canvas'); let width = img.width, height = img.height;
           const MAX_SIDE = 2560; if (width > MAX_SIDE || height > MAX_SIDE) { if (width > height) { height *= MAX_SIDE / width; width = MAX_SIDE; } else { width *= MAX_SIDE / height; height = MAX_SIDE; } }
           canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => { if (blob) { state.photos[idx].push({ blob: blob, previewUrl: URL.createObjectURL(blob), timestamp: new Date().toISOString() }); } processedCount++; if (processedCount === files.length) renderChecklist(); }, 'image/jpeg', 0.5);
+          canvas.toBlob((blob) => { 
+            if (blob) { 
+              state.photos[idx].push({ blob: blob, previewUrl: URL.createObjectURL(blob), timestamp: new Date().toISOString() }); 
+            } 
+            processedCount++; 
+            if (processedCount === files.length) {
+              saveDraft(); // Обязательно сохраняем черновик после добавления фото
+              renderChecklist();
+            }
+          }, 'image/jpeg', 0.5);
         };
         img.src = event.target.result;
       };
@@ -282,7 +392,15 @@
     globalFileInput.value = '';
   });
 
-  function removePhoto(configIdx, photoIdx) { const targetPhoto = state.photos[configIdx][photoIdx]; if (targetPhoto) { URL.revokeObjectURL(targetPhoto.previewUrl); state.photos[configIdx].splice(photoIdx, 1); renderChecklist(); } }
+  function removePhoto(configIdx, photoIdx) { 
+    const targetPhoto = state.photos[configIdx][photoIdx]; 
+    if (targetPhoto) { 
+      URL.revokeObjectURL(targetPhoto.previewUrl); 
+      state.photos[configIdx].splice(photoIdx, 1); 
+      saveDraft(); // Сохраняем черновик после удаления фото
+      renderChecklist(); 
+    } 
+  }
   function validateForm() { generateBtn.disabled = !state.photos.every(arr => arr.length > 0); }
 
   function readBlobAsArrayBuffer(blob) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onloadend = () => resolve(new Uint8Array(reader.result)); reader.onerror = reject; reader.readAsArrayBuffer(blob); }); }
@@ -322,6 +440,9 @@
         const tx = db.transaction("archives", "readwrite");
         tx.objectStore("archives").put({ name: currentZipName, blob: currentZipBlob, text: emailBodyText, date: new Date().toISOString() });
       }
+      
+      // Отчет успешно сохранен, черновик больше не нужен
+      clearDraft();
 
       generateBtn.innerText = "✓ Архив собран!";
       savedFileNameSpan.innerText = currentZipName;
@@ -341,6 +462,10 @@
     state = { objectName: '', address: '', installerName: localStorage.getItem('installerName') || '', serialNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
     currentZipBlob = null; currentZipName = "";
     document.getElementById('objectName').value = ''; document.getElementById('address').value = ''; document.getElementById('serialNumber').value = ''; document.getElementById('comment').value = '';
+    
+    // Очищаем черновик, если пользователь решил вернуться на главный экран
+    clearDraft();
+    
     manualSendInstructions.classList.add('hidden'); shareTextBtn.classList.add('hidden'); resetGenBtn(); checklistScreen.classList.add('hidden'); formScreen.classList.remove('hidden');
   });
 
