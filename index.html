@@ -171,7 +171,7 @@
     </div>
   </div>
 
-  <footer>ООО Эталон Стандарт | Версия 1.6 (PWA)</footer>
+  <footer>ООО Эталон Стандарт | Версия 1.7 (PWA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -182,13 +182,11 @@
 <input type="file" id="globalFileInput" accept="image/*" multiple class="hidden">
 
 <script>
-  // Регистрация Service Worker для офлайн режима
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => console.log('PWA Offline Ready'));
   }
 
-  // Настройка базы данных (IndexedDB)
-  // Версия повышена до 2, чтобы создать новое хранилище для черновика
+  // Настройка базы данных
   let db;
   const dbRequest = indexedDB.open("EtalonPWA_DB", 2);
   dbRequest.onupgradeneeded = (e) => {
@@ -202,7 +200,7 @@
   };
   dbRequest.onsuccess = (e) => { 
     db = e.target.result; 
-    checkDraft(); // При запуске проверяем наличие незаконченного отчета
+    checkDraft(); 
   };
 
   const mandatoryConfig = [
@@ -218,6 +216,7 @@
     { title: "📄 Паспорт, отметка, SIM", prefix: "10_passport_sim" }
   ];
 
+  // state.photos теперь хранит { dataUrl: string, timestamp: string }
   let state = { objectName: '', address: '', installerName: '', serialNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
   let currentZipBlob = null, currentZipName = "";
 
@@ -232,7 +231,7 @@
     if (savedName) document.getElementById('installerName').value = savedName;
   });
 
-  // Логика автосохранения (Черновики)
+  // НАДЕЖНЫЙ ЧЕРНОВИК (Полное кодирование в Base64)
   function saveDraft() {
     if (!db) return;
     const draftState = {
@@ -243,8 +242,7 @@
       comment: state.comment,
       coordinates: state.coordinates,
       creationDate: state.creationDate,
-      // Сохраняем только blob файлов, так как previewUrl уничтожаются при закрытии
-      photos: state.photos.map(arr => arr.map(p => ({ blob: p.blob, timestamp: p.timestamp })))
+      photos: state.photos // Теперь тут надежные строки dataUrl, которые не удаляются системой
     };
     const tx = db.transaction("drafts", "readwrite");
     tx.objectStore("drafts").put({ id: "current", data: draftState });
@@ -281,14 +279,9 @@
         document.getElementById('comment').value = state.comment;
 
         if (d.photos) {
-          state.photos = d.photos.map(arr => arr.map(p => ({
-            blob: p.blob,
-            timestamp: p.timestamp,
-            previewUrl: URL.createObjectURL(p.blob) // Заново создаем превью для отображения
-          })));
+          state.photos = d.photos; 
         }
 
-        // Если дата создания уже есть, значит монтажник уже был на экране чеклиста
         if (state.creationDate) {
           formScreen.classList.add('hidden');
           checklistScreen.classList.remove('hidden');
@@ -311,7 +304,6 @@
     };
   }
 
-  // Обновляем состояние при любом вводе текста, чтобы сразу сохранять черновик
   ['objectName', 'address', 'installerName', 'serialNumber', 'comment'].forEach(id => {
     document.getElementById(id).addEventListener('input', (e) => {
       state[id] = e.target.value.trim();
@@ -327,7 +319,7 @@
     navigator.geolocation.getCurrentPosition((pos) => {
       state.coordinates = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
       displayCoords.className = "geo-status-badge geo-success"; displayCoords.innerText = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (~${Math.round(pos.coords.accuracy)}м)`;
-      saveDraft(); // Сохраняем геоданные в черновик
+      saveDraft(); 
     }, () => { displayCoords.className = "geo-status-badge geo-error"; displayCoords.innerText = "Включите GPS в настройках Safari."; }, { enableHighAccuracy: true, timeout: 10000 });
   }
 
@@ -338,7 +330,7 @@
     formScreen.classList.add('hidden'); checklistScreen.classList.remove('hidden');
     document.getElementById('displayObject').innerText = state.objectName; document.getElementById('displayAddress').innerText = state.address; document.getElementById('displayInstaller').innerText = state.installerName; document.getElementById('displaySerial').innerText = state.serialNumber;
     state.creationDate = new Date().toISOString(); 
-    saveDraft(); // Сохраняем переход на второй экран
+    saveDraft(); 
     startBackgroundGeoCollection(); 
     renderChecklist();
   });
@@ -353,7 +345,7 @@
       const mediaRow = document.createElement('div'); mediaRow.className = 'media-row';
       photosArray.forEach((pData, pIdx) => {
         const pContainer = document.createElement('div'); pContainer.className = 'photo-container';
-        const img = document.createElement('img'); img.src = pData.previewUrl; img.className = 'thumbnail'; img.onclick = (e) => { e.stopPropagation(); openLightbox(pData.previewUrl); };
+        const img = document.createElement('img'); img.src = pData.dataUrl; img.className = 'thumbnail'; img.onclick = (e) => { e.stopPropagation(); openLightbox(pData.dataUrl); };
         const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '&times;'; delBtn.onclick = (e) => { e.stopPropagation(); removePhoto(idx, pIdx); };
         pContainer.appendChild(img); pContainer.appendChild(delBtn); mediaRow.appendChild(pContainer);
       });
@@ -363,6 +355,7 @@
     validateForm();
   }
 
+  // СИСТЕМА УМНОГО СЖАТИЯ (Защита от потери данных в iOS)
   globalFileInput.addEventListener('change', (e) => {
     const files = Array.from(e.target.files), idx = state.currentActiveIndex; if (files.length === 0 || idx === null) return;
     let processedCount = 0;
@@ -372,18 +365,23 @@
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas'); let width = img.width, height = img.height;
-          const MAX_SIDE = 2560; if (width > MAX_SIDE || height > MAX_SIDE) { if (width > height) { height *= MAX_SIDE / width; width = MAX_SIDE; } else { width *= MAX_SIDE / height; height = MAX_SIDE; } }
+          // Жестко ограничиваем размер для стабильности iOS (1280px отлично для отчета, весит копейки)
+          const MAX_SIDE = 1280; 
+          if (width > MAX_SIDE || height > MAX_SIDE) { 
+            if (width > height) { height *= MAX_SIDE / width; width = MAX_SIDE; } 
+            else { width *= MAX_SIDE / height; height = MAX_SIDE; } 
+          }
           canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => { 
-            if (blob) { 
-              state.photos[idx].push({ blob: blob, previewUrl: URL.createObjectURL(blob), timestamp: new Date().toISOString() }); 
-            } 
-            processedCount++; 
-            if (processedCount === files.length) {
-              saveDraft(); // Обязательно сохраняем черновик после добавления фото
-              renderChecklist();
-            }
-          }, 'image/jpeg', 0.5);
+          
+          // Получаем надежную текстовую строку вместо хрупкого Blob-файла
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
+          state.photos[idx].push({ dataUrl: dataUrl, timestamp: new Date().toISOString() }); 
+          
+          processedCount++; 
+          if (processedCount === files.length) {
+            saveDraft(); 
+            renderChecklist();
+          }
         };
         img.src = event.target.result;
       };
@@ -393,17 +391,21 @@
   });
 
   function removePhoto(configIdx, photoIdx) { 
-    const targetPhoto = state.photos[configIdx][photoIdx]; 
-    if (targetPhoto) { 
-      URL.revokeObjectURL(targetPhoto.previewUrl); 
-      state.photos[configIdx].splice(photoIdx, 1); 
-      saveDraft(); // Сохраняем черновик после удаления фото
-      renderChecklist(); 
-    } 
+    state.photos[configIdx].splice(photoIdx, 1); 
+    saveDraft(); 
+    renderChecklist(); 
   }
   function validateForm() { generateBtn.disabled = !state.photos.every(arr => arr.length > 0); }
 
-  function readBlobAsArrayBuffer(blob) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onloadend = () => resolve(new Uint8Array(reader.result)); reader.onerror = reject; reader.readAsArrayBuffer(blob); }); }
+  // Конвертация из строки обратно в байты для ZIP-архива
+  function dataURItoUint8Array(dataURI) {
+    const base64 = dataURI.split(',')[1];
+    const binary_string = window.atob(base64);
+    const len = binary_string.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) { bytes[i] = binary_string.charCodeAt(i); }
+    return bytes;
+  }
 
   function buildEmailBodyText() {
     let text = `Отчет о проделанных работах по монтажу оборудования:\n\n• Наименование объекта: ${state.objectName}\n• Адрес объекта: ${state.address}\n• ФИО монтажника: ${state.installerName}\n• Серийный номер счетчика: ${state.serialNumber}\n• Дата/время генерации: ${formatDateTime(state.creationDate)}\n`;
@@ -412,17 +414,29 @@
   }
 
   generateBtn.addEventListener('click', async () => {
-    generateBtn.innerText = "⏳ Сборка архива..."; generateBtn.disabled = true;
+    generateBtn.innerText = "⏳ Подготовка файлов..."; generateBtn.disabled = true;
     const emailBodyText = buildEmailBodyText();
     try {
       const filesToPack = [];
-      mandatoryConfig.forEach((cfg, idx) => { state.photos[idx].forEach((pData, pIdx) => { filesToPack.push({ name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, blob: pData.blob }); }); });
-      filesToPack.unshift({ name: 'report_info.txt', blob: new Blob([emailBodyText], {type:'text/plain'}) });
+      mandatoryConfig.forEach((cfg, idx) => { 
+        state.photos[idx].forEach((pData, pIdx) => { 
+          filesToPack.push({ 
+            name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, 
+            bytes: dataURItoUint8Array(pData.dataUrl) // Моментальная сборка из надежной строки
+          }); 
+        }); 
+      });
+      filesToPack.unshift({ name: 'report_info.txt', bytes: new TextEncoder().encode(emailBodyText) });
 
       let fileData = [], centralDir = [], offset = 0; const encoder = new TextEncoder();
       for (let i = 0; i < filesToPack.length; i++) {
-        const file = filesToPack[i]; generateBtn.innerText = `⏳ Упаковка: ${i + 1}/${filesToPack.length}...`;
-        const nameBytes = encoder.encode(file.name); const bodyBytes = await readBlobAsArrayBuffer(file.blob);
+        const file = filesToPack[i]; 
+        generateBtn.innerText = `⏳ Упаковка: ${i + 1}/${filesToPack.length}...`;
+        await new Promise(r => setTimeout(r, 10)); // Даем экрану обновиться
+        
+        const nameBytes = encoder.encode(file.name); 
+        const bodyBytes = file.bytes;
+        
         let crc = 0xFFFFFFFF; for (let b = 0; b < bodyBytes.length; b++) { crc ^= bodyBytes[b]; for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0); } crc ^= 0xFFFFFFFF;
         const lfh = new Uint8Array(30 + nameBytes.length); lfh.set([0x50, 0x4B, 0x03, 0x04, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, crc & 0xFF, (crc >>> 8) & 0xFF, (crc >>> 16) & 0xFF, (crc >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, nameBytes.length & 0xFF, (nameBytes.length >>> 8) & 0xFF, 0, 0]); lfh.set(nameBytes, 30); fileData.push(lfh, bodyBytes);
         const cdh = new Uint8Array(46 + nameBytes.length); cdh.set([0x50, 0x4B, 0x01, 0x02, 20, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, crc & 0xFF, (crc >>> 8) & 0xFF, (crc >>> 16) & 0xFF, (crc >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, nameBytes.length & 0xFF, (nameBytes.length >>> 8) & 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, offset & 0xFF, (offset >>> 8) & 0xFF, (offset >>> 16) & 0xFF, (offset >>> 24) & 0xFF]); cdh.set(nameBytes, 46); centralDir.push(cdh); offset += lfh.length + bodyBytes.length;
@@ -435,13 +449,11 @@
       currentZipName = `${sanitizedSerial}_${dateStr}.zip`;
       currentZipBlob = new Blob([finalZipUint8], { type: "application/zip" });
 
-      // Сохраняем во внутреннюю базу данных IndexedDB
       if (db) {
         const tx = db.transaction("archives", "readwrite");
         tx.objectStore("archives").put({ name: currentZipName, blob: currentZipBlob, text: emailBodyText, date: new Date().toISOString() });
       }
       
-      // Отчет успешно сохранен, черновик больше не нужен
       clearDraft();
 
       generateBtn.innerText = "✓ Архив собран!";
@@ -458,12 +470,10 @@
   });
 
   document.getElementById('resetAllBtn').addEventListener('click', () => {
-    state.photos.forEach(arr => { arr.forEach(p => URL.revokeObjectURL(p.previewUrl)); });
     state = { objectName: '', address: '', installerName: localStorage.getItem('installerName') || '', serialNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
     currentZipBlob = null; currentZipName = "";
     document.getElementById('objectName').value = ''; document.getElementById('address').value = ''; document.getElementById('serialNumber').value = ''; document.getElementById('comment').value = '';
     
-    // Очищаем черновик, если пользователь решил вернуться на главный экран
     clearDraft();
     
     manualSendInstructions.classList.add('hidden'); shareTextBtn.classList.add('hidden'); resetGenBtn(); checklistScreen.classList.add('hidden'); formScreen.classList.remove('hidden');
@@ -556,14 +566,12 @@
     selectedArchives.clear(); isMultiSelectMode = false; renderArchiveList();
   });
 
-  // УМНАЯ ШТОРКА iOS ОТПРАВКИ И СКАЧИВАНИЯ
   async function shareFiles(filesDataArray, subjectText) {
     const filesToShare = [];
     filesDataArray.forEach(f => {
       filesToShare.push(new File([f.blob], f.name, { type: "application/zip" }));
     });
 
-    // Если Safari онлайн и поддерживает Web Share API, открываем шторку напрямую
     if (navigator.canShare && navigator.canShare({ files: filesToShare })) {
       try {
         let textMsg = filesDataArray.length === 1 ? filesDataArray[0].text : "Архивы фотоотчетов во вложении.";
@@ -573,7 +581,6 @@
       } catch (err) { console.log("Share skipped/failed"); }
     }
 
-    // Если офлайн или шторка не сработала — скачиваем архив прямо в приложение "Файлы" на iPhone
     filesDataArray.forEach(f => {
       const link = document.createElement('a'); link.href = URL.createObjectURL(f.blob); link.download = f.name;
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
@@ -598,7 +605,6 @@
     deleteFiles(Array.from(selectedArchives));
   });
 
-  // Просмотр картинок (Лайтбокс)
   const modal = document.getElementById('photoModal'), modalImg = document.getElementById('modalImg'), modalWrapper = document.getElementById('modalWrapper');
   let scale = 1, startDist = 0, isDragging = false, startX = 0, startY = 0, posX = 0, posY = 0;
   function openLightbox(url) { modalImg.src = url; modal.style.display = 'flex'; resetZoom(); }
