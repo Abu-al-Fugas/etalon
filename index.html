@@ -171,7 +171,7 @@
     </div>
   </div>
 
-  <footer>ООО Эталон Стандарт | Версия 1.4 (PWA)</footer>
+  <footer>ООО Эталон Стандарт | Версия 1.5 (PWA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -197,7 +197,7 @@
 
   const mandatoryConfig = [
     { title: "🏢 Общий вид объекта (здания)", prefix: "01_building" },
-    { title: "📍 Место установки до монтажа", prefix: "02_place_before" },
+    { title: "📍 Газопровод издалека", prefix: "02_place_before" },
     { title: "⚙️ Общий вид старого счетчика", prefix: "03_old_meter_view" },
     { title: "🔢 Серийный номер и показания старого", prefix: "04_old_meter_serial" },
     { title: "🔒 Фото пломбы старого счетчика", prefix: "05_old_seal" },
@@ -205,8 +205,7 @@
     { title: "🔢 Серийный номер и показания нового", prefix: "07_new_meter_serial" },
     { title: "➡️ Направление потока газа (стрелка)", prefix: "08_gas_direction" },
     { title: "🔒 Фото пломбы нового счетчика", prefix: "09_new_seal" },
-    { title: "📄 Паспорт счётчика с отметкой", prefix: "10_passport" },
-    { title: "📱 SIM-карта на фоне паспорта", prefix: "11_sim_passport" }
+    { title: "📄 Паспорт, отметка, SIM", prefix: "10_passport_sim" }
   ];
 
   let state = { objectName: '', address: '', installerName: '', serialNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
