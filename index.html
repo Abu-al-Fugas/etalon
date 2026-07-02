@@ -99,7 +99,7 @@
     <div class="card">
       <h1>ООО Эталон Стандарт</h1>
       <div class="form-group">
-        <label class="required">Наименование объекта (номер)</label>
+        <label class="required">Название объекта</label>
         <input type="text" id="objectName" placeholder="Пример: Дом 25, Котельная №3" autocomplete="off">
       </div>
       <div class="form-group">
@@ -128,6 +128,11 @@
           <option value="CMT- Комплекс G65">CMT- Комплекс G65</option>
         </select>
       </div>
+      
+      <div class="form-group">
+        <label class="required">Должность потребителя</label>
+        <input type="text" id="consumerRole" placeholder="Пример: Собственник, Инженер">
+      </div>
       <div class="form-group">
         <label class="required">ФИО потребителя</label>
         <input type="text" id="consumerName" placeholder="Пример: Петров П.П.">
@@ -149,7 +154,7 @@
     <div class="card" style="background: #f1f5f9; border-radius: 16px;">
       <h2 style="border-left-color: #0f2d19; font-size: 1rem; margin-bottom: 6px;">Объект: <span id="displayObject"></span></h2>
       <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">📍 <span id="displayAddress"></span></p>
-      <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">👤 Потребитель: <span id="displayConsumer"></span> | Л/С: <span id="displayAccount"></span></p>
+      <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">👤 Потребитель: <span id="displayConsumerRole"></span> <span id="displayConsumer"></span> | Л/С: <span id="displayAccount"></span></p>
       <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">👤 Монтажник: <span id="displayInstaller"></span></p>
       <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">⚙️ Модель: <span id="displayModel"></span> | 🔢 №: <span id="displaySerial"></span></p>
       <div>
@@ -196,7 +201,7 @@
     </div>
   </div>
 
-  <footer>ООО Эталон Стандарт | Версия 1.8 (PWA)</footer>
+  <footer>ООО Эталон Стандарт | Версия 1.9 (PWA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -231,17 +236,18 @@
     { title: "🏢 Общий вид объекта (здания)", prefix: "01_building" },
     { title: "📍 Газопровод издалека", prefix: "02_place_before" },
     { title: "⚙️ Общий вид старого счетчика", prefix: "03_old_meter_view" },
-    { title: "🔢 Серийный номер и показания старого", prefix: "04_old_meter_serial" },
-    { title: "🔒 Фото пломбы старого счетчика", prefix: "05_old_seal" },
-    { title: "➡️ Фото направления потока газа старого счетчика", prefix: "06_old_gas_direction" },
-    { title: "✨ Общий вид установленного счётчика", prefix: "07_new_meter_view" },
-    { title: "🔢 Серийный номер и показания нового", prefix: "08_new_meter_serial" },
-    { title: "➡️ Направление потока газа (стрелка)", prefix: "09_new_gas_direction" },
-    { title: "🔒 Фото пломбы нового счетчика", prefix: "10_new_seal" },
-    { title: "📄 Паспорт, отметка, SIM", prefix: "11_passport_sim" }
+    { title: "🔢 Серийный № и показания старого", prefix: "04_old_meter_serial" },
+    { title: "🔒 Пломба старого счетчика", prefix: "05_old_seal" },
+    { title: "➡️ Направление старого счетчика", prefix: "06_old_gas_direction" },
+    { title: "✨ Общий вид нового счётчика", prefix: "07_new_meter_view" },
+    { title: "🔢 Серийный № нового", prefix: "08_new_meter_serial" },
+    { title: "📊 Показания нового", prefix: "09_new_meter_readings" },
+    { title: "➡️ Направление нового счетчика", prefix: "10_new_gas_direction" },
+    { title: "🔒 Пломба нового счетчика", prefix: "11_new_seal" },
+    { title: "📄 Паспорт, отметка, SIM", prefix: "12_passport_sim" }
   ];
 
-  let state = { objectName: '', address: '', installerName: '', serialNumber: '', meterModel: '', consumerName: '', accountNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
+  let state = { objectName: '', address: '', installerName: '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
   let currentZipBlob = null, currentZipName = "";
 
   const formScreen = document.getElementById('formScreen'), checklistScreen = document.getElementById('checklistScreen'), archiveScreen = document.getElementById('archiveScreen');
@@ -263,6 +269,7 @@
       installerName: state.installerName,
       serialNumber: state.serialNumber,
       meterModel: state.meterModel,
+      consumerRole: state.consumerRole,
       consumerName: state.consumerName,
       accountNumber: state.accountNumber,
       comment: state.comment,
@@ -295,6 +302,7 @@
         state.installerName = d.installerName || '';
         state.serialNumber = d.serialNumber || '';
         state.meterModel = d.meterModel || '';
+        state.consumerRole = d.consumerRole || '';
         state.consumerName = d.consumerName || '';
         state.accountNumber = d.accountNumber || '';
         state.comment = d.comment || '';
@@ -306,16 +314,21 @@
         document.getElementById('installerName').value = state.installerName;
         document.getElementById('serialNumber').value = state.serialNumber;
         document.getElementById('meterModel').value = state.meterModel;
+        document.getElementById('consumerRole').value = state.consumerRole;
         document.getElementById('consumerName').value = state.consumerName;
         document.getElementById('accountNumber').value = state.accountNumber;
         document.getElementById('comment').value = state.comment;
 
         if (d.photos) {
           state.photos = d.photos; 
-          // Защита от сдвига фотографий при обновлении чек-листа со старого черновика (где было 10 пунктов вместо 11)
+          // Защита от сдвига фотографий при миграции черновика
           if (state.photos.length === 10) {
-            state.photos.splice(5, 0, []); 
-          } else while (state.photos.length < mandatoryConfig.length) {
+            state.photos.splice(5, 0, []);
+            state.photos.splice(8, 0, []);
+          } else if (state.photos.length === 11) {
+            state.photos.splice(8, 0, []);
+          }
+          while (state.photos.length < mandatoryConfig.length) {
             state.photos.push([]);
           }
         }
@@ -325,6 +338,7 @@
           checklistScreen.classList.remove('hidden');
           document.getElementById('displayObject').innerText = state.objectName;
           document.getElementById('displayAddress').innerText = state.address;
+          document.getElementById('displayConsumerRole').innerText = state.consumerRole;
           document.getElementById('displayConsumer').innerText = state.consumerName;
           document.getElementById('displayAccount').innerText = state.accountNumber;
           document.getElementById('displayInstaller').innerText = state.installerName;
@@ -345,7 +359,7 @@
     };
   }
 
-  ['objectName', 'address', 'installerName', 'serialNumber', 'consumerName', 'accountNumber', 'comment'].forEach(id => {
+  ['objectName', 'address', 'installerName', 'serialNumber', 'consumerRole', 'consumerName', 'accountNumber', 'comment'].forEach(id => {
     document.getElementById(id).addEventListener('input', (e) => {
       state[id] = e.target.value.trim();
       saveDraft();
@@ -375,11 +389,12 @@
     state.installerName = document.getElementById('installerName').value.trim(); 
     state.serialNumber = document.getElementById('serialNumber').value.trim(); 
     state.meterModel = document.getElementById('meterModel').value.trim();
+    state.consumerRole = document.getElementById('consumerRole').value.trim();
     state.consumerName = document.getElementById('consumerName').value.trim();
     state.accountNumber = document.getElementById('accountNumber').value.trim();
     state.comment = document.getElementById('comment').value.trim();
     
-    if (!state.objectName || !state.address || !state.installerName || !state.serialNumber || !state.meterModel || !state.consumerName || !state.accountNumber) { 
+    if (!state.objectName || !state.address || !state.installerName || !state.serialNumber || !state.meterModel || !state.consumerRole || !state.consumerName || !state.accountNumber) { 
       alert("Заполните обязательные поля!"); return; 
     }
     
@@ -388,6 +403,7 @@
     
     document.getElementById('displayObject').innerText = state.objectName;
     document.getElementById('displayAddress').innerText = state.address;
+    document.getElementById('displayConsumerRole').innerText = state.consumerRole;
     document.getElementById('displayConsumer').innerText = state.consumerName;
     document.getElementById('displayAccount').innerText = state.accountNumber;
     document.getElementById('displayInstaller').innerText = state.installerName;
@@ -469,35 +485,39 @@
   }
 
   function buildEmailBodyText() {
-    let text = `Отчет о проделанных работах по монтажу оборудования:\n\n• Наименование объекта: ${state.objectName}\n• Адрес объекта: ${state.address}\n• ФИО потребителя: ${state.consumerName}\n• Лицевой счет: ${state.accountNumber}\n• ФИО монтажника: ${state.installerName}\n• Модель нового счетчика: ${state.meterModel}\n• Серийный № нового счетчика: ${state.serialNumber}\n• Дата/время генерации: ${formatDateTime(state.creationDate)}\n`;
-    text += `• Координаты GPS: ${(state.coordinates) ? state.coordinates.lat.toFixed(6)+', '+state.coordinates.lng.toFixed(6) : 'Не определены'}\n• Комментарий монтажника: ${state.comment || 'Отсутствует'}`;
+    const gps = (state.coordinates && !state.coordinates.error) ? `${state.coordinates.lat.toFixed(6)}, ${state.coordinates.lng.toFixed(6)}` : 'Не определены';
+    const comment = state.comment || 'Отсутствует';
+    const datetime = formatDateTime(state.creationDate);
+
+    let text = `• Объект: ${state.objectName}\n`;
+    text += `• Адрес: ${state.address}\n`;
+    text += `• GPS: ${gps}\n`;
+    text += `• Должность: ${state.consumerRole}\n`;
+    text += `• Потребитель: ${state.consumerName}\n`;
+    text += `• ЛС: ${state.accountNumber}\n`;
+    text += `-----------------------------------\n`;
+    text += `• Модель: ${state.meterModel}\n`;
+    text += `• №: ${state.serialNumber}\n`;
+    text += `-----------------------------------\n`;
+    text += `• Монтажник: ${state.installerName}\n`;
+    text += `• ${comment}\n`;
+    text += `• ${datetime}`;
+
     return text;
   }
 
   generateBtn.addEventListener('click', async () => {
-    generateBtn.innerText = "⏳ Подготовка файлов..."; generateBtn.disabled = true;
+    generateBtn.innerText = "⏳ Сборка архива..."; generateBtn.disabled = true;
     const emailBodyText = buildEmailBodyText();
     try {
       const filesToPack = [];
-      mandatoryConfig.forEach((cfg, idx) => { 
-        state.photos[idx].forEach((pData, pIdx) => { 
-          filesToPack.push({ 
-            name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, 
-            bytes: dataURItoUint8Array(pData.dataUrl) 
-          }); 
-        }); 
-      });
-      filesToPack.unshift({ name: 'report_info.txt', bytes: new TextEncoder().encode(emailBodyText) });
+      mandatoryConfig.forEach((cfg, idx) => { state.photos[idx].forEach((pData, pIdx) => { filesToPack.push({ name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, blob: dataURItoUint8Array(pData.dataUrl) }); }); });
+      filesToPack.unshift({ name: 'report_info.txt', blob: new TextEncoder().encode(emailBodyText) });
 
       let fileData = [], centralDir = [], offset = 0; const encoder = new TextEncoder();
       for (let i = 0; i < filesToPack.length; i++) {
-        const file = filesToPack[i]; 
-        generateBtn.innerText = `⏳ Упаковка: ${i + 1}/${filesToPack.length}...`;
-        await new Promise(r => setTimeout(r, 10)); 
-        
-        const nameBytes = encoder.encode(file.name); 
-        const bodyBytes = file.bytes;
-        
+        const file = filesToPack[i]; generateBtn.innerText = `⏳ Упаковка: ${i + 1}/${filesToPack.length}...`;
+        const nameBytes = encoder.encode(file.name); const bodyBytes = file.blob;
         let crc = 0xFFFFFFFF; for (let b = 0; b < bodyBytes.length; b++) { crc ^= bodyBytes[b]; for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0); } crc ^= 0xFFFFFFFF;
         const lfh = new Uint8Array(30 + nameBytes.length); lfh.set([0x50, 0x4B, 0x03, 0x04, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, crc & 0xFF, (crc >>> 8) & 0xFF, (crc >>> 16) & 0xFF, (crc >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, nameBytes.length & 0xFF, (nameBytes.length >>> 8) & 0xFF, 0, 0]); lfh.set(nameBytes, 30); fileData.push(lfh, bodyBytes);
         const cdh = new Uint8Array(46 + nameBytes.length); cdh.set([0x50, 0x4B, 0x01, 0x02, 20, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, crc & 0xFF, (crc >>> 8) & 0xFF, (crc >>> 16) & 0xFF, (crc >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, nameBytes.length & 0xFF, (nameBytes.length >>> 8) & 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, offset & 0xFF, (offset >>> 8) & 0xFF, (offset >>> 16) & 0xFF, (offset >>> 24) & 0xFF]); cdh.set(nameBytes, 46); centralDir.push(cdh); offset += lfh.length + bodyBytes.length;
@@ -531,9 +551,10 @@
   });
 
   document.getElementById('resetAllBtn').addEventListener('click', () => {
-    state = { objectName: '', address: '', installerName: localStorage.getItem('installerName') || '', serialNumber: '', meterModel: '', consumerName: '', accountNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
+    state.photos.forEach(arr => { arr.forEach(p => URL.revokeObjectURL(p.previewUrl)); });
+    state = { objectName: '', address: '', installerName: localStorage.getItem('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
     currentZipBlob = null; currentZipName = "";
-    document.getElementById('objectName').value = ''; document.getElementById('address').value = ''; document.getElementById('serialNumber').value = ''; document.getElementById('meterModel').value = ''; document.getElementById('consumerName').value = ''; document.getElementById('accountNumber').value = ''; document.getElementById('comment').value = '';
+    document.getElementById('objectName').value = ''; document.getElementById('address').value = ''; document.getElementById('serialNumber').value = ''; document.getElementById('meterModel').value = ''; document.getElementById('consumerRole').value = ''; document.getElementById('consumerName').value = ''; document.getElementById('accountNumber').value = ''; document.getElementById('comment').value = '';
     
     clearDraft();
     
