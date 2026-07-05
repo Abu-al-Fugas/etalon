@@ -13,7 +13,7 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f6f9; padding: max(12px, env(safe-area-inset-top)) 12px 12px 12px; color: #1e293b; user-select: none; }
-    .container { max-width: 600px; margin: 0 auto; padding-bottom: 30px; position: relative; }
+    .container { max-width: 600px; margin: 0 auto; padding-bottom: 250px; position: relative; }
     .card { background: white; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); padding: 20px 16px; margin-bottom: 16px; position: relative; }
     h1 { font-size: 1.6rem; font-weight: 700; color: #1e4620; margin-bottom: 16px; text-align: center; }
     h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 14px; border-left: 4px solid #2b7a4b; padding-left: 10px; color: #0f2d19; }
@@ -22,9 +22,13 @@
     label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 0.85rem; color: #334155; }
     .required::after { content: " *"; color: #ef4444; }
     
-    input, textarea, select { width: 100%; padding: 12px 14px; font-size: 0.95rem; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; font-family: inherit; -webkit-appearance: none; }
+    .input-wrapper { display: flex; gap: 8px; align-items: center; }
+    input, textarea, select { flex-grow: 1; width: 100%; padding: 12px 14px; font-size: 0.95rem; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; font-family: inherit; -webkit-appearance: none; }
     input:focus, textarea:focus, select:focus { outline: none; border-color: #2b7a4b; box-shadow: 0 0 0 3px rgba(43,122,75,0.15); }
     select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 40px; }
+
+    .scan-btn { background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 12px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; flex-shrink: 0; }
+    .scan-btn:active { background: #cbd5e1; }
 
     button { background: #2b7a4b; color: white; border: none; border-radius: 14px; padding: 14px 20px; font-size: 1rem; font-weight: 600; width: 100%; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     button:active { transform: scale(0.98); background: #1f5a3b; }
@@ -69,26 +73,20 @@
     .archive-name { font-weight: 600; font-size: 0.95rem; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     
     .multi-action-bar-wrapper {
-      position: fixed;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 100%;
-      max-width: 600px;
-      background: white;
-      padding: 12px 16px max(16px, env(safe-area-inset-bottom));
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
-      z-index: 100;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      border-top-left-radius: 20px;
-      border-top-right-radius: 20px;
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 600px;
+      background: white; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+      z-index: 100; display: flex; flex-direction: column; gap: 10px; border-top-left-radius: 20px; border-top-right-radius: 20px;
     }
     .action-row { display: flex; gap: 10px; }
     .action-row button { padding: 10px 4px; margin: 0; font-size: 0.95rem; border-radius: 10px; flex: 1; white-space: nowrap; height: 42px; }
 
     footer { text-align: center; font-size: 0.75rem; color: #94a3b8; margin-top: 20px; }
+    
+    /* Стили для блока расчета мощности */
+    .power-grid { display: flex; gap: 8px; margin-bottom: 8px; }
+    .power-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .power-label { font-size: 0.75rem; color: #64748b; text-align: center; font-weight: 600; }
+    .power-input { text-align: center; padding: 10px; font-weight: 600; font-size: 1.1rem;}
   </style>
 </head>
 <body>
@@ -110,11 +108,43 @@
         <label class="required">ФИО монтажника</label>
         <input type="text" id="installerName" placeholder="Иванов И.И.">
       </div>
+      
+      <div class="form-group" style="background: #f8fafc; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0;">
+        <label class="required" style="color: #0f2d19; font-size: 0.95rem;">Подсчет мощности</label>
+        <div class="power-grid">
+          <div class="power-col">
+            <span class="power-label">кВт</span>
+            <input type="number" id="powerKw" class="power-input" placeholder="0" min="0" step="0.1">
+          </div>
+          <div class="power-col">
+            <span class="power-label">m³/ч</span>
+            <input type="number" id="powerM3" class="power-input" placeholder="0" min="0" step="0.1">
+          </div>
+          <div class="power-col">
+            <span class="power-label">ПГ (шт)</span>
+            <input type="number" id="powerPg" class="power-input" placeholder="0" min="0" step="1">
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
+          <div>
+            <div style="font-size: 0.8rem; color: #64748b;">Итого: <strong id="powerTotal" style="color: #1e293b; font-size: 1rem;">0.00</strong> m³/ч</div>
+            <div style="font-size: 0.85rem; color: #2b7a4b; font-weight: 600; margin-top: 4px;" id="suggestedMeter">Счетчик: Вычислите мощность</div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 16px; border-top: 1px solid #cbd5e1; padding-top: 12px;">
+          <label class="required" style="font-size: 0.85rem; color: #0f2d19; margin-bottom: 8px;">Фото газовых приборов</label>
+          <div class="media-row" id="gasPhotosRow" style="min-height: 70px;">
+            </div>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="required">Серийный № нового счетчика</label>
-        <input type="text" id="serialNumber" placeholder="Введите серийный номер">
+        <div class="input-wrapper">
+          <input type="text" id="serialNumber" placeholder="Ввод или скан ->">
+        </div>
       </div>
-      
       <div class="form-group">
         <label class="required">Модель нового счетчика</label>
         <select id="meterModel">
@@ -141,10 +171,7 @@
         <label class="required">Лицевой счет</label>
         <input type="text" id="accountNumber" placeholder="Пример: 123456789">
       </div>
-      <div class="form-group">
-        <label>Комментарий</label>
-        <textarea rows="2" id="comment" placeholder="Дополнительная информация..."></textarea>
-      </div>
+
       <button id="startReportBtn" style="margin-bottom: 12px;">▶ Начать фотоотчёт</button>
       <button id="openArchivesBtn" class="secondary">📁 Сохраненные архивы</button>
     </div>
@@ -164,6 +191,10 @@
     </div>
     <div class="card">
       <h2>Загрузите фотографии</h2>
+      <div id="syncStatus" style="font-size: 0.8rem; text-align: center; color: #d97706; margin-bottom: 10px;" class="hidden">
+        Внимание: Нет сети. Отчет будет сохранен локально и отправлен в базу позже.
+      </div>
+
       <div class="photo-grid" id="mandatoryList"></div>
     </div>
     <div class="card">
@@ -201,7 +232,7 @@
     </div>
   </div>
 
-  <footer>ООО Эталон Стандарт | Версия 1.9 (PWA)</footer>
+  <footer>ООО Эталон Стандарт | Версия 3.0 (PWA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -211,9 +242,45 @@
 
 <input type="file" id="globalFileInput" accept="image/*" multiple class="hidden">
 
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => console.log('PWA Offline Ready'));
+  }
+
+  // Скрипт для плавного подъема страницы над клавиатурой для любых полей (iOS Fix)
+  document.addEventListener('focusin', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+      setTimeout(() => {
+        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  });
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCofoBIWqUX_P8pQUIKKbitEG2GTbXT7Ak",
+    authDomain: "botstm100.firebaseapp.com",
+    databaseURL: "https://botstm100-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "botstm100",
+    storageBucket: "botstm100.firebasestorage.app",
+    messagingSenderId: "462080340216",
+    appId: "1:462080340216:web:c452983a1501f0bf170b0d"
+  };
+
+  let fbDb = null;
+  
+  function initFirebaseSafe() {
+    if (typeof firebase !== 'undefined') {
+      firebase.initializeApp(firebaseConfig);
+      fbDb = firebase.database();
+      fbDb.ref('.info/connected').on('value', snap => {
+        if (snap.val() === true) {
+          syncPendingRecords();
+        }
+      });
+    }
   }
 
   let db;
@@ -226,39 +293,116 @@
     if (!database.objectStoreNames.contains("drafts")) {
       database.createObjectStore("drafts", { keyPath: "id" });
     }
+    if (!database.objectStoreNames.contains("pending_sync")) {
+      database.createObjectStore("pending_sync", { keyPath: "id", autoIncrement: true });
+    }
   };
   dbRequest.onsuccess = (e) => { 
     db = e.target.result; 
     checkDraft(); 
+    initFirebaseSafe();
   };
 
   const mandatoryConfig = [
-    { title: "🏢 Общий вид объекта (здания)", prefix: "01_building" },
-    { title: "📍 Газопровод издалека", prefix: "02_place_before" },
-    { title: "⚙️ Общий вид старого счетчика", prefix: "03_old_meter_view" },
-    { title: "🔢 Серийный № и показания старого", prefix: "04_old_meter_serial" },
-    { title: "🔒 Пломба старого счетчика", prefix: "05_old_seal" },
-    { title: "➡️ Направление старого счетчика", prefix: "06_old_gas_direction" },
-    { title: "✨ Общий вид нового счётчика", prefix: "07_new_meter_view" },
-    { title: "🔢 Серийный № нового", prefix: "08_new_meter_serial" },
-    { title: "📊 Показания нового", prefix: "09_new_meter_readings" },
-    { title: "➡️ Направление нового счетчика", prefix: "10_new_gas_direction" },
-    { title: "🔒 Пломба нового счетчика", prefix: "11_new_seal" },
-    { title: "📄 Паспорт, отметка, SIM", prefix: "12_passport_sim" }
+    { title: "🏠 Общий вид объекта (здания)", prefix: "01_building" },
+    { title: "🛣️ Газопровод издалека", prefix: "02_place_before" },
+    { title: "🕰️ Общий вид старого счетчика", prefix: "03_old_meter_view" },
+    { title: "🏷️ Серийный № и показания старого", prefix: "04_old_meter_serial" },
+    { title: "🏭 Пломба заводская 2-3 фото", prefix: "04_1_factory_seal" },
+    { title: "👮 Пломба контролера старого", prefix: "05_old_seal_controller", hasInput: true },
+    { title: "⬅️ Направление старого счетчика", prefix: "06_old_gas_direction" },
+    { title: "📦 Общий вид нового счётчика", prefix: "07_new_meter_view" },
+    { title: "🆕 Серийный № нового", prefix: "08_new_meter_serial" },
+    { title: "📟 Показания нового", prefix: "09_new_meter_readings" },
+    { title: "↗️ Направление нового счетчика", prefix: "10_new_gas_direction" },
+    { title: "🛡️ Пломба нового счетчика", prefix: "11_new_seal" },
+    { title: "📑 Паспорт, отметка, SIM", prefix: "12_passport_sim" }
   ];
 
-  let state = { objectName: '', address: '', installerName: '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
+  let state = { 
+    objectName: '', address: '', installerName: '', serialNumber: '', meterModel: '', 
+    consumerRole: '', consumerName: '', accountNumber: '', 
+    powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: '-', controllerSeal: '',
+    coordinates: null, creationDate: null, 
+    photos: Array.from({ length: mandatoryConfig.length }, () => []), 
+    gasPhotos: [], 
+    currentActiveIndex: null 
+  };
   let currentZipBlob = null, currentZipName = "";
 
   const formScreen = document.getElementById('formScreen'), checklistScreen = document.getElementById('checklistScreen'), archiveScreen = document.getElementById('archiveScreen');
   const mandatoryListDiv = document.getElementById('mandatoryList'), globalFileInput = document.getElementById('globalFileInput'), generateBtn = document.getElementById('generateReportBtn'), shareTextBtn = document.getElementById('shareTextBtn'), displayCoords = document.getElementById('displayCoords'), manualSendInstructions = document.getElementById('manualSendInstructions'), savedFileNameSpan = document.getElementById('savedFileNameSpan');
   const archiveListContainer = document.getElementById('archiveListContainer'), multiActionBar = document.getElementById('multiActionBar');
+  const syncStatus = document.getElementById('syncStatus');
 
   let savedArchives = []; let selectedArchives = new Set(); let isMultiSelectMode = false;
 
   window.addEventListener('DOMContentLoaded', () => {
     const savedName = localStorage.getItem('installerName');
     if (savedName) document.getElementById('installerName').value = savedName;
+    
+    // Запрос геолокации при загрузке (iOS Safari)
+    startBackgroundGeoCollection();
+  });
+
+  function syncPendingRecords() {
+    if (!navigator.onLine || !db || !fbDb) return;
+    const tx = db.transaction("pending_sync", "readonly");
+    const store = tx.objectStore("pending_sync");
+    const req = store.getAll();
+    req.onsuccess = (e) => {
+      const records = e.target.result;
+      records.forEach(record => {
+        fbDb.ref('bot_installations').push(record.data).then(() => {
+          const txDel = db.transaction("pending_sync", "readwrite");
+          txDel.objectStore("pending_sync").delete(record.id);
+        }).catch(err => console.log("Firebase sync err", err));
+      });
+    };
+  }
+  window.addEventListener('online', () => { syncStatus.classList.add('hidden'); syncPendingRecords(); });
+  window.addEventListener('offline', () => { syncStatus.classList.remove('hidden'); });
+
+  function updatePowerCalc() {
+    let kw = parseFloat(document.getElementById('powerKw').value) || 0;
+    let m3 = parseFloat(document.getElementById('powerM3').value) || 0;
+    let pg = parseFloat(document.getElementById('powerPg').value) || 0;
+    
+    let total = (kw * 0.116) + m3 + pg;
+    state.totalPower = total.toFixed(2);
+    document.getElementById('powerTotal').innerText = state.totalPower;
+    
+    let suggested = "-";
+    let modelValue = "";
+    if (total === 0) { suggested = "Вычислите мощность"; modelValue = ""; }
+    else if (total <= 6.2) { suggested = "Счетчик: G4 (запас " + (7 - total).toFixed(2) + ")"; modelValue = "CMT-Смарт G4"; }
+    else if (total <= 10.2) { suggested = "Счетчик: G6 (запас " + (11 - total).toFixed(2) + ")"; modelValue = "CMT-Смарт G6"; }
+    else if (total <= 17.2) { suggested = "Счетчик: G10 (запас " + (18 - total).toFixed(2) + ")"; modelValue = "CMT-Смарт G10"; }
+    else if (total <= 27.2) { suggested = "Счетчик: G16 (запас " + (28 - total).toFixed(2) + ")"; modelValue = "CMT- Комплекс G16"; }
+    else if (total <= 44.2) { suggested = "Счетчик: G25 (запас " + (45 - total).toFixed(2) + ")"; modelValue = "CMT- Комплекс G25"; }
+    else if (total <= 71.2) { suggested = "Счетчик: G40 (запас " + (72 - total).toFixed(2) + ")"; modelValue = "CMT- Комплекс G40"; }
+    else if (total <= 109.2) { suggested = "Счетчик: G65 (запас " + (110 - total).toFixed(2) + ")"; modelValue = "CMT- Комплекс G65"; }
+    else { suggested = "Требуется промышленный"; modelValue = ""; }
+    
+    state.suggestedMeter = suggested;
+    document.getElementById('suggestedMeter').innerText = suggested;
+    
+    if (modelValue) {
+      document.getElementById('meterModel').value = modelValue;
+      state.meterModel = modelValue;
+    } else {
+      document.getElementById('meterModel').value = "";
+      state.meterModel = "";
+    }
+    
+    saveDraft();
+  }
+
+  ['powerKw', 'powerM3', 'powerPg'].forEach(id => {
+    document.getElementById(id).addEventListener('input', (e) => {
+      state[id] = e.target.value;
+      updatePowerCalc();
+    });
   });
 
   function saveDraft() {
@@ -272,10 +416,16 @@
       consumerRole: state.consumerRole,
       consumerName: state.consumerName,
       accountNumber: state.accountNumber,
-      comment: state.comment,
+      powerKw: state.powerKw,
+      powerM3: state.powerM3,
+      powerPg: state.powerPg,
+      totalPower: state.totalPower,
+      suggestedMeter: state.suggestedMeter,
+      controllerSeal: state.controllerSeal,
       coordinates: state.coordinates,
       creationDate: state.creationDate,
-      photos: state.photos 
+      photos: state.photos,
+      gasPhotos: state.gasPhotos
     };
     const tx = db.transaction("drafts", "readwrite");
     tx.objectStore("drafts").put({ id: "current", data: draftState });
@@ -305,7 +455,12 @@
         state.consumerRole = d.consumerRole || '';
         state.consumerName = d.consumerName || '';
         state.accountNumber = d.accountNumber || '';
-        state.comment = d.comment || '';
+        state.powerKw = d.powerKw || '';
+        state.powerM3 = d.powerM3 || '';
+        state.powerPg = d.powerPg || '';
+        state.totalPower = d.totalPower || '0.00';
+        state.suggestedMeter = d.suggestedMeter || 'Вычислите мощность';
+        state.controllerSeal = d.controllerSeal || '';
         state.coordinates = d.coordinates || null;
         state.creationDate = d.creationDate || null;
 
@@ -317,21 +472,21 @@
         document.getElementById('consumerRole').value = state.consumerRole;
         document.getElementById('consumerName').value = state.consumerName;
         document.getElementById('accountNumber').value = state.accountNumber;
-        document.getElementById('comment').value = state.comment;
+        document.getElementById('powerKw').value = state.powerKw;
+        document.getElementById('powerM3').value = state.powerM3;
+        document.getElementById('powerPg').value = state.powerPg;
+        document.getElementById('powerTotal').innerText = state.totalPower;
+        document.getElementById('suggestedMeter').innerText = state.suggestedMeter;
 
         if (d.photos) {
           state.photos = d.photos; 
-          // Защита от сдвига фотографий при миграции черновика
-          if (state.photos.length === 10) {
-            state.photos.splice(5, 0, []);
-            state.photos.splice(8, 0, []);
-          } else if (state.photos.length === 11) {
-            state.photos.splice(8, 0, []);
-          }
-          while (state.photos.length < mandatoryConfig.length) {
-            state.photos.push([]);
-          }
+          if (state.photos.length === 10) { state.photos.splice(5, 0, []); state.photos.splice(8, 0, []); } 
+          else if (state.photos.length === 11) { state.photos.splice(8, 0, []); }
+          while (state.photos.length < mandatoryConfig.length) { state.photos.push([]); }
         }
+        
+        state.gasPhotos = d.gasPhotos || [];
+        renderGasPhotos();
 
         if (state.creationDate) {
           formScreen.classList.add('hidden');
@@ -355,22 +510,19 @@
           
           renderChecklist();
         }
+      } else {
+        renderGasPhotos();
       }
     };
   }
 
-  ['objectName', 'address', 'installerName', 'serialNumber', 'consumerRole', 'consumerName', 'accountNumber', 'comment'].forEach(id => {
+  ['objectName', 'address', 'installerName', 'serialNumber', 'consumerRole', 'consumerName', 'accountNumber'].forEach(id => {
     document.getElementById(id).addEventListener('input', (e) => {
       state[id] = e.target.value.trim();
       saveDraft();
     });
   });
   
-  document.getElementById('meterModel').addEventListener('change', (e) => {
-    state.meterModel = e.target.value.trim();
-    saveDraft();
-  });
-
   function formatDateTime(isoString) { if (!isoString) return '—'; const d = new Date(isoString); return d.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}); }
 
   function startBackgroundGeoCollection() {
@@ -383,6 +535,32 @@
     }, () => { displayCoords.className = "geo-status-badge geo-error"; displayCoords.innerText = "Включите GPS в настройках Safari."; }, { enableHighAccuracy: true, timeout: 10000 });
   }
 
+  function renderGasPhotos() {
+    const row = document.getElementById('gasPhotosRow');
+    if(!row) return;
+    row.innerHTML = '';
+    
+    const placeholder = document.createElement('div'); 
+    placeholder.className = 'add-photo-placeholder'; 
+    placeholder.innerHTML = `<span>➕</span>Добавить`; 
+    placeholder.onclick = () => { 
+      state.currentActiveIndex = 'gas'; 
+      globalFileInput.click(); 
+    };
+    row.appendChild(placeholder);
+
+    state.gasPhotos.forEach((pData, pIdx) => {
+      const pContainer = document.createElement('div'); pContainer.className = 'photo-container';
+      const img = document.createElement('img'); 
+      img.src = pData.dataUrl; 
+      img.className = 'thumbnail'; 
+      img.onclick = (e) => { e.stopPropagation(); openLightbox(pData.dataUrl); };
+      const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '&times;'; 
+      delBtn.onclick = (e) => { e.stopPropagation(); state.gasPhotos.splice(pIdx, 1); saveDraft(); renderGasPhotos(); };
+      pContainer.appendChild(img); pContainer.appendChild(delBtn); row.appendChild(pContainer);
+    });
+  }
+
   document.getElementById('startReportBtn').addEventListener('click', () => {
     state.objectName = document.getElementById('objectName').value.trim(); 
     state.address = document.getElementById('address').value.trim(); 
@@ -392,8 +570,20 @@
     state.consumerRole = document.getElementById('consumerRole').value.trim();
     state.consumerName = document.getElementById('consumerName').value.trim();
     state.accountNumber = document.getElementById('accountNumber').value.trim();
-    state.comment = document.getElementById('comment').value.trim();
     
+    let kw = parseFloat(state.powerKw) || 0;
+    let m3 = parseFloat(state.powerM3) || 0;
+    let pg = parseFloat(state.powerPg) || 0;
+    if (kw === 0 && m3 === 0 && pg === 0) {
+      alert("Для подсчета мощности заполните хотя бы одно из полей (кВт, m³/ч или ПГ)!");
+      return;
+    }
+
+    if (state.gasPhotos.length === 0) {
+      alert("Добавьте хотя бы одно фото газовых приборов!");
+      return;
+    }
+
     if (!state.objectName || !state.address || !state.installerName || !state.serialNumber || !state.meterModel || !state.consumerRole || !state.consumerName || !state.accountNumber) { 
       alert("Заполните обязательные поля!"); return; 
     }
@@ -410,9 +600,10 @@
     document.getElementById('displayModel').innerText = state.meterModel;
     document.getElementById('displaySerial').innerText = state.serialNumber;
     
+    if (!navigator.onLine) syncStatus.classList.remove('hidden');
+    
     state.creationDate = new Date().toISOString(); 
     saveDraft(); 
-    startBackgroundGeoCollection(); 
     renderChecklist();
   });
 
@@ -423,55 +614,91 @@
       const item = document.createElement('div'); item.className = 'photo-item';
       const headerDiv = document.createElement('div'); headerDiv.className = 'photo-header';
       headerDiv.innerHTML = `<div><div class="photo-title">${cfg.title}</div>${hasPhotos ? `<div class="photo-meta">Файлов: ${photosArray.length}</div>` : `<div class="photo-meta" style="color:#ef4444;">Нет файлов *</div>`}</div>`;
+      item.appendChild(headerDiv);
+
+      if (cfg.hasInput) {
+        const inputDiv = document.createElement('div');
+        inputDiv.innerHTML = `<input type="text" placeholder="Введите номер пломбы" value="${state.controllerSeal}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 0.9rem;">`;
+        const inputField = inputDiv.querySelector('input');
+        inputField.addEventListener('input', (e) => {
+          state.controllerSeal = e.target.value.trim();
+          saveDraft();
+        });
+        item.appendChild(inputDiv);
+      }
+
       const mediaRow = document.createElement('div'); mediaRow.className = 'media-row';
+      const placeholder = document.createElement('div'); placeholder.className = 'add-photo-placeholder'; placeholder.innerHTML = `<span>➕</span>Добавить`; placeholder.onclick = () => { state.currentActiveIndex = idx; globalFileInput.click(); };
+      mediaRow.appendChild(placeholder);
+      
       photosArray.forEach((pData, pIdx) => {
         const pContainer = document.createElement('div'); pContainer.className = 'photo-container';
         const img = document.createElement('img'); img.src = pData.dataUrl; img.className = 'thumbnail'; img.onclick = (e) => { e.stopPropagation(); openLightbox(pData.dataUrl); };
         const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '&times;'; delBtn.onclick = (e) => { e.stopPropagation(); removePhoto(idx, pIdx); };
         pContainer.appendChild(img); pContainer.appendChild(delBtn); mediaRow.appendChild(pContainer);
       });
-      const placeholder = document.createElement('div'); placeholder.className = 'add-photo-placeholder'; placeholder.innerHTML = `<span>➕</span>Добавить`; placeholder.onclick = () => { state.currentActiveIndex = idx; globalFileInput.click(); };
-      mediaRow.appendChild(placeholder); item.appendChild(headerDiv); item.appendChild(mediaRow); mandatoryListDiv.appendChild(item);
+      
+      item.appendChild(mediaRow); mandatoryListDiv.appendChild(item);
     });
     validateForm();
   }
 
-  globalFileInput.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files), idx = state.currentActiveIndex; if (files.length === 0 || idx === null) return;
-    let processedCount = 0;
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas'); let width = img.width, height = img.height;
-          const MAX_SIDE = 1280; 
-          if (width > MAX_SIDE || height > MAX_SIDE) { 
-            if (width > height) { height *= MAX_SIDE / width; width = MAX_SIDE; } 
-            else { width *= MAX_SIDE / height; height = MAX_SIDE; } 
-          }
-          canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-          
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
-          state.photos[idx].push({ dataUrl: dataUrl, timestamp: new Date().toISOString() }); 
-          
-          processedCount++; 
-          if (processedCount === files.length) {
-            saveDraft(); 
-            renderChecklist();
-          }
+  globalFileInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files);
+    const idx = state.currentActiveIndex; 
+    if (files.length === 0 || idx === null) return;
+    
+    globalFileInput.disabled = true;
+    
+    for (let i = 0; i < files.length; i++) {
+      await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas'); 
+            let width = img.width, height = img.height;
+            const MAX_SIDE = 1280; 
+            if (width > MAX_SIDE || height > MAX_SIDE) { 
+              if (width > height) { height *= MAX_SIDE / width; width = MAX_SIDE; } 
+              else { width *= MAX_SIDE / height; height = MAX_SIDE; } 
+            }
+            canvas.width = width; canvas.height = height; 
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+            
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
+            const photoObj = { dataUrl: dataUrl, timestamp: new Date().toISOString() };
+            
+            if (idx === 'gas') {
+              state.gasPhotos.push(photoObj);
+            } else {
+              state.photos[idx].push(photoObj);
+            }
+            resolve();
+          };
+          img.onerror = () => resolve(); 
+          img.src = event.target.result;
         };
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-    globalFileInput.value = '';
+        reader.onerror = () => resolve();
+        reader.readAsDataURL(files[i]);
+      });
+    }
+
+    saveDraft(); 
+    if (idx === 'gas') {
+      renderGasPhotos();
+    } else {
+      renderChecklist();
+    }
+    
+    globalFileInput.value = ''; 
+    globalFileInput.disabled = false;
   });
 
   function removePhoto(configIdx, photoIdx) { 
-    state.photos[configIdx].splice(photoIdx, 1); 
+    if (configIdx === 'gas') { state.gasPhotos.splice(photoIdx, 1); renderGasPhotos(); }
+    else { state.photos[configIdx].splice(photoIdx, 1); renderChecklist(); }
     saveDraft(); 
-    renderChecklist(); 
   }
   function validateForm() { generateBtn.disabled = !state.photos.every(arr => arr.length > 0); }
 
@@ -486,21 +713,22 @@
 
   function buildEmailBodyText() {
     const gps = (state.coordinates && !state.coordinates.error) ? `${state.coordinates.lat.toFixed(6)}, ${state.coordinates.lng.toFixed(6)}` : 'Не определены';
-    const comment = state.comment || 'Отсутствует';
     const datetime = formatDateTime(state.creationDate);
+    const seal = state.controllerSeal ? state.controllerSeal : 'нет';
 
     let text = `• Объект: ${state.objectName}\n`;
     text += `• Адрес: ${state.address}\n`;
+    text += `• Мощность: ${state.totalPower} m3/ч\n`;
     text += `• GPS: ${gps}\n`;
     text += `• Должность: ${state.consumerRole}\n`;
     text += `• Потребитель: ${state.consumerName}\n`;
+    text += `• Пломба: ${seal}\n`;
     text += `• ЛС: ${state.accountNumber}\n`;
-    text += `-----------------------------------\n`;
+    text += `--------------------\n`;
     text += `• Модель: ${state.meterModel}\n`;
     text += `• №: ${state.serialNumber}\n`;
-    text += `-----------------------------------\n`;
+    text += `--------------------\n`;
     text += `• Монтажник: ${state.installerName}\n`;
-    text += `• ${comment}\n`;
     text += `• ${datetime}`;
 
     return text;
@@ -511,12 +739,29 @@
     const emailBodyText = buildEmailBodyText();
     try {
       const filesToPack = [];
-      mandatoryConfig.forEach((cfg, idx) => { state.photos[idx].forEach((pData, pIdx) => { filesToPack.push({ name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, blob: dataURItoUint8Array(pData.dataUrl) }); }); });
+      
+      state.gasPhotos.forEach((pData, pIdx) => {
+        filesToPack.push({
+          name: state.gasPhotos.length === 1 ? `00_gas_appliances.jpg` : `00_gas_appliances_${pIdx + 1}.jpg`,
+          blob: dataURItoUint8Array(pData.dataUrl)
+        });
+      });
+
+      mandatoryConfig.forEach((cfg, idx) => { 
+        state.photos[idx].forEach((pData, pIdx) => { 
+          filesToPack.push({ 
+            name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, 
+            blob: dataURItoUint8Array(pData.dataUrl) 
+          }); 
+        }); 
+      });
       filesToPack.unshift({ name: 'report_info.txt', blob: new TextEncoder().encode(emailBodyText) });
 
       let fileData = [], centralDir = [], offset = 0; const encoder = new TextEncoder();
       for (let i = 0; i < filesToPack.length; i++) {
         const file = filesToPack[i]; generateBtn.innerText = `⏳ Упаковка: ${i + 1}/${filesToPack.length}...`;
+        await new Promise(r => setTimeout(r, 10)); // Даем UI обновиться
+        
         const nameBytes = encoder.encode(file.name); const bodyBytes = file.blob;
         let crc = 0xFFFFFFFF; for (let b = 0; b < bodyBytes.length; b++) { crc ^= bodyBytes[b]; for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0); } crc ^= 0xFFFFFFFF;
         const lfh = new Uint8Array(30 + nameBytes.length); lfh.set([0x50, 0x4B, 0x03, 0x04, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, crc & 0xFF, (crc >>> 8) & 0xFF, (crc >>> 16) & 0xFF, (crc >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, bodyBytes.length & 0xFF, (bodyBytes.length >>> 8) & 0xFF, (bodyBytes.length >>> 16) & 0xFF, (bodyBytes.length >>> 24) & 0xFF, nameBytes.length & 0xFF, (nameBytes.length >>> 8) & 0xFF, 0, 0]); lfh.set(nameBytes, 30); fileData.push(lfh, bodyBytes);
@@ -529,6 +774,38 @@
       let sanitizedSerial = state.serialNumber.replace(/[^a-zа-яё0-9]/gi, '_').substring(0, 24);
       currentZipName = `${sanitizedSerial}_${dateStr}.zip`;
       currentZipBlob = new Blob([finalZipUint8], { type: "application/zip" });
+
+      const fbReportData = {
+        objectName: state.objectName,
+        address: state.address,
+        installer: state.installerName,
+        serial: state.serialNumber,
+        model: state.meterModel,
+        position: state.consumerRole,
+        consumer: state.consumerName,
+        ls: state.accountNumber,
+        totalPower: state.totalPower,
+        controllerSeal: state.controllerSeal,
+        gps: (state.coordinates && !state.coordinates.error) ? `${state.coordinates.lat.toFixed(6)}, ${state.coordinates.lng.toFixed(6)}` : 'Нет',
+        date: formatDateTime(state.creationDate),
+        timestamp: firebase.database.ServerValue ? firebase.database.ServerValue.TIMESTAMP : Date.now()
+      };
+
+      function pushToFirebase(data) {
+        if (fbDb && navigator.onLine) {
+          fbDb.ref('bot_installations').push(data).catch(() => saveToPendingSync(data));
+        } else {
+          saveToPendingSync(data);
+        }
+      }
+
+      function saveToPendingSync(data) {
+        if (!db) return;
+        const tx = db.transaction("pending_sync", "readwrite");
+        tx.objectStore("pending_sync").add({ data: data });
+      }
+
+      pushToFirebase(fbReportData);
 
       if (db) {
         const tx = db.transaction("archives", "readwrite");
@@ -552,11 +829,12 @@
 
   document.getElementById('resetAllBtn').addEventListener('click', () => {
     state.photos.forEach(arr => { arr.forEach(p => URL.revokeObjectURL(p.previewUrl)); });
-    state = { objectName: '', address: '', installerName: localStorage.getItem('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', comment: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), currentActiveIndex: null };
+    state = { objectName: '', address: '', installerName: localStorage.getItem('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: 'Вычислите мощность', controllerSeal: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), gasPhotos: [], currentActiveIndex: null };
     currentZipBlob = null; currentZipName = "";
-    document.getElementById('objectName').value = ''; document.getElementById('address').value = ''; document.getElementById('serialNumber').value = ''; document.getElementById('meterModel').value = ''; document.getElementById('consumerRole').value = ''; document.getElementById('consumerName').value = ''; document.getElementById('accountNumber').value = ''; document.getElementById('comment').value = '';
+    document.getElementById('objectName').value = ''; document.getElementById('address').value = ''; document.getElementById('serialNumber').value = ''; document.getElementById('meterModel').value = ''; document.getElementById('consumerRole').value = ''; document.getElementById('consumerName').value = ''; document.getElementById('accountNumber').value = ''; document.getElementById('powerKw').value = ''; document.getElementById('powerM3').value = ''; document.getElementById('powerPg').value = ''; document.getElementById('powerTotal').innerText = '0.00'; document.getElementById('suggestedMeter').innerText = 'Вычислите мощность';
     
     clearDraft();
+    renderGasPhotos();
     
     manualSendInstructions.classList.add('hidden'); shareTextBtn.classList.add('hidden'); resetGenBtn(); checklistScreen.classList.add('hidden'); formScreen.classList.remove('hidden');
   });
