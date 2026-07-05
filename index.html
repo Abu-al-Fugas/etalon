@@ -336,11 +336,12 @@
 
   let savedArchives = []; let selectedArchives = new Set(); let isMultiSelectMode = false;
 
-  window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', () => {
     const savedName = localStorage.getItem('installerName');
     if (savedName) document.getElementById('installerName').value = savedName;
     
     startBackgroundGeoCollection(); // Запрос геолокации сразу
+    renderGasPhotos(); // <-- Добавлено для отображения кнопки "+Добавить" на всех устройствах
   });
 
   function syncPendingRecords() {
