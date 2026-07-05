@@ -142,7 +142,7 @@
       <div class="form-group">
         <label class="required">Серийный № нового счетчика</label>
         <div class="input-wrapper">
-          <input type="text" id="serialNumber" placeholder="Ввод или скан ->">
+          <input type="text" id="serialNumber" placeholder="Введите серийный номер">
         </div>
       </div>
       <div class="form-group">
@@ -171,7 +171,7 @@
         <label class="required">Лицевой счет</label>
         <input type="text" id="accountNumber" placeholder="Пример: 123456789">
       </div>
-
+      
       <button id="startReportBtn" style="margin-bottom: 12px;">▶ Начать фотоотчёт</button>
       <button id="openArchivesBtn" class="secondary">📁 Сохраненные архивы</button>
     </div>
@@ -232,7 +232,7 @@
     </div>
   </div>
 
-  <footer>ООО Эталон Стандарт | Версия 3.0 (PWA)</footer>
+  <footer>Друид_33 | Версия 3.5 (PWA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -242,15 +242,8 @@
 
 <input type="file" id="globalFileInput" accept="image/*" multiple class="hidden">
 
-<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(() => console.log('PWA Offline Ready'));
-  }
-
-  // Скрипт для плавного подъема страницы над клавиатурой для любых полей (iOS Fix)
+  // Глобальное отслеживание фокуса на любых полях ввода для плавного подъема над клавиатурой (iOS)
   document.addEventListener('focusin', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
       setTimeout(() => {
@@ -258,6 +251,10 @@
       }, 300);
     }
   });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(() => console.log('PWA Offline Ready'));
+  }
 
   const firebaseConfig = {
     apiKey: "AIzaSyCofoBIWqUX_P8pQUIKKbitEG2GTbXT7Ak",
@@ -271,15 +268,18 @@
 
   let fbDb = null;
   
-  function initFirebaseSafe() {
+  // Безопасная инициализация базы данных
+  function initFirebase() {
     if (typeof firebase !== 'undefined') {
       firebase.initializeApp(firebaseConfig);
       fbDb = firebase.database();
+      
       fbDb.ref('.info/connected').on('value', snap => {
         if (snap.val() === true) {
           syncPendingRecords();
         }
       });
+      syncPendingRecords();
     }
   }
 
@@ -300,7 +300,6 @@
   dbRequest.onsuccess = (e) => { 
     db = e.target.result; 
     checkDraft(); 
-    initFirebaseSafe();
   };
 
   const mandatoryConfig = [
@@ -341,8 +340,7 @@
     const savedName = localStorage.getItem('installerName');
     if (savedName) document.getElementById('installerName').value = savedName;
     
-    // Запрос геолокации при загрузке (iOS Safari)
-    startBackgroundGeoCollection();
+    startBackgroundGeoCollection(); // Запрос геолокации сразу
   });
 
   function syncPendingRecords() {
@@ -394,7 +392,6 @@
       document.getElementById('meterModel').value = "";
       state.meterModel = "";
     }
-    
     saveDraft();
   }
 
@@ -408,24 +405,12 @@
   function saveDraft() {
     if (!db) return;
     const draftState = {
-      objectName: state.objectName,
-      address: state.address,
-      installerName: state.installerName,
-      serialNumber: state.serialNumber,
-      meterModel: state.meterModel,
-      consumerRole: state.consumerRole,
-      consumerName: state.consumerName,
-      accountNumber: state.accountNumber,
-      powerKw: state.powerKw,
-      powerM3: state.powerM3,
-      powerPg: state.powerPg,
-      totalPower: state.totalPower,
-      suggestedMeter: state.suggestedMeter,
-      controllerSeal: state.controllerSeal,
-      coordinates: state.coordinates,
-      creationDate: state.creationDate,
-      photos: state.photos,
-      gasPhotos: state.gasPhotos
+      objectName: state.objectName, address: state.address, installerName: state.installerName,
+      serialNumber: state.serialNumber, meterModel: state.meterModel,
+      consumerRole: state.consumerRole, consumerName: state.consumerName, accountNumber: state.accountNumber,
+      powerKw: state.powerKw, powerM3: state.powerM3, powerPg: state.powerPg,
+      totalPower: state.totalPower, suggestedMeter: state.suggestedMeter, controllerSeal: state.controllerSeal,
+      coordinates: state.coordinates, creationDate: state.creationDate, photos: state.photos, gasPhotos: state.gasPhotos
     };
     const tx = db.transaction("drafts", "readwrite");
     tx.objectStore("drafts").put({ id: "current", data: draftState });
@@ -447,22 +432,14 @@
       if (result && result.data) {
         const d = result.data;
         
-        state.objectName = d.objectName || '';
-        state.address = d.address || '';
-        state.installerName = d.installerName || '';
-        state.serialNumber = d.serialNumber || '';
-        state.meterModel = d.meterModel || '';
-        state.consumerRole = d.consumerRole || '';
-        state.consumerName = d.consumerName || '';
-        state.accountNumber = d.accountNumber || '';
-        state.powerKw = d.powerKw || '';
-        state.powerM3 = d.powerM3 || '';
-        state.powerPg = d.powerPg || '';
-        state.totalPower = d.totalPower || '0.00';
-        state.suggestedMeter = d.suggestedMeter || 'Вычислите мощность';
+        state.objectName = d.objectName || ''; state.address = d.address || '';
+        state.installerName = d.installerName || ''; state.serialNumber = d.serialNumber || '';
+        state.meterModel = d.meterModel || ''; state.consumerRole = d.consumerRole || '';
+        state.consumerName = d.consumerName || ''; state.accountNumber = d.accountNumber || '';
+        state.powerKw = d.powerKw || ''; state.powerM3 = d.powerM3 || ''; state.powerPg = d.powerPg || '';
+        state.totalPower = d.totalPower || '0.00'; state.suggestedMeter = d.suggestedMeter || 'Вычислите мощность';
         state.controllerSeal = d.controllerSeal || '';
-        state.coordinates = d.coordinates || null;
-        state.creationDate = d.creationDate || null;
+        state.coordinates = d.coordinates || null; state.creationDate = d.creationDate || null;
 
         document.getElementById('objectName').value = state.objectName;
         document.getElementById('address').value = state.address;
@@ -480,8 +457,6 @@
 
         if (d.photos) {
           state.photos = d.photos; 
-          if (state.photos.length === 10) { state.photos.splice(5, 0, []); state.photos.splice(8, 0, []); } 
-          else if (state.photos.length === 11) { state.photos.splice(8, 0, []); }
           while (state.photos.length < mandatoryConfig.length) { state.photos.push([]); }
         }
         
@@ -510,8 +485,6 @@
           
           renderChecklist();
         }
-      } else {
-        renderGasPhotos();
       }
     };
   }
@@ -522,7 +495,7 @@
       saveDraft();
     });
   });
-  
+
   function formatDateTime(isoString) { if (!isoString) return '—'; const d = new Date(isoString); return d.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}); }
 
   function startBackgroundGeoCollection() {
@@ -570,18 +543,16 @@
     state.consumerRole = document.getElementById('consumerRole').value.trim();
     state.consumerName = document.getElementById('consumerName').value.trim();
     state.accountNumber = document.getElementById('accountNumber').value.trim();
-    
+
     let kw = parseFloat(state.powerKw) || 0;
     let m3 = parseFloat(state.powerM3) || 0;
     let pg = parseFloat(state.powerPg) || 0;
     if (kw === 0 && m3 === 0 && pg === 0) {
-      alert("Для подсчета мощности заполните хотя бы одно из полей (кВт, m³/ч или ПГ)!");
-      return;
+      alert("Для подсчета мощности заполните хотя бы одно из полей (кВт, m³/ч или ПГ)!"); return;
     }
 
     if (state.gasPhotos.length === 0) {
-      alert("Добавьте хотя бы одно фото газовых приборов!");
-      return;
+      alert("Добавьте хотя бы одно фото газовых приборов!"); return;
     }
 
     if (!state.objectName || !state.address || !state.installerName || !state.serialNumber || !state.meterModel || !state.consumerRole || !state.consumerName || !state.accountNumber) { 
@@ -620,10 +591,7 @@
         const inputDiv = document.createElement('div');
         inputDiv.innerHTML = `<input type="text" placeholder="Введите номер пломбы" value="${state.controllerSeal}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 0.9rem;">`;
         const inputField = inputDiv.querySelector('input');
-        inputField.addEventListener('input', (e) => {
-          state.controllerSeal = e.target.value.trim();
-          saveDraft();
-        });
+        inputField.addEventListener('input', (e) => { state.controllerSeal = e.target.value.trim(); saveDraft(); });
         item.appendChild(inputDiv);
       }
 
@@ -643,56 +611,37 @@
     validateForm();
   }
 
-  globalFileInput.addEventListener('change', async (e) => {
-    const files = Array.from(e.target.files);
-    const idx = state.currentActiveIndex; 
-    if (files.length === 0 || idx === null) return;
-    
-    globalFileInput.disabled = true;
-    
-    for (let i = 0; i < files.length; i++) {
-      await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas'); 
-            let width = img.width, height = img.height;
-            const MAX_SIDE = 1280; 
-            if (width > MAX_SIDE || height > MAX_SIDE) { 
-              if (width > height) { height *= MAX_SIDE / width; width = MAX_SIDE; } 
-              else { width *= MAX_SIDE / height; height = MAX_SIDE; } 
-            }
-            canvas.width = width; canvas.height = height; 
-            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-            
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
-            const photoObj = { dataUrl: dataUrl, timestamp: new Date().toISOString() };
-            
-            if (idx === 'gas') {
-              state.gasPhotos.push(photoObj);
-            } else {
-              state.photos[idx].push(photoObj);
-            }
-            resolve();
-          };
-          img.onerror = () => resolve(); 
-          img.src = event.target.result;
+  globalFileInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files), idx = state.currentActiveIndex; if (files.length === 0 || idx === null) return;
+    let processedCount = 0;
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas'); let width = img.width, height = img.height;
+          const MAX_SIDE = 1280; 
+          if (width > MAX_SIDE || height > MAX_SIDE) { 
+            if (width > height) { height *= MAX_SIDE / width; width = MAX_SIDE; } 
+            else { width *= MAX_SIDE / height; height = MAX_SIDE; } 
+          }
+          canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
+          if (idx === 'gas') { state.gasPhotos.push({ dataUrl: dataUrl, timestamp: new Date().toISOString() }); }
+          else { state.photos[idx].push({ dataUrl: dataUrl, timestamp: new Date().toISOString() }); }
+          
+          processedCount++; 
+          if (processedCount === files.length) {
+            saveDraft(); 
+            if (idx === 'gas') renderGasPhotos(); else renderChecklist();
+          }
         };
-        reader.onerror = () => resolve();
-        reader.readAsDataURL(files[i]);
-      });
-    }
-
-    saveDraft(); 
-    if (idx === 'gas') {
-      renderGasPhotos();
-    } else {
-      renderChecklist();
-    }
-    
-    globalFileInput.value = ''; 
-    globalFileInput.disabled = false;
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+    globalFileInput.value = '';
   });
 
   function removePhoto(configIdx, photoIdx) { 
@@ -741,20 +690,10 @@
       const filesToPack = [];
       
       state.gasPhotos.forEach((pData, pIdx) => {
-        filesToPack.push({
-          name: state.gasPhotos.length === 1 ? `00_gas_appliances.jpg` : `00_gas_appliances_${pIdx + 1}.jpg`,
-          blob: dataURItoUint8Array(pData.dataUrl)
-        });
+        filesToPack.push({ name: state.gasPhotos.length === 1 ? `00_gas_appliances.jpg` : `00_gas_appliances_${pIdx + 1}.jpg`, blob: dataURItoUint8Array(pData.dataUrl) });
       });
 
-      mandatoryConfig.forEach((cfg, idx) => { 
-        state.photos[idx].forEach((pData, pIdx) => { 
-          filesToPack.push({ 
-            name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, 
-            blob: dataURItoUint8Array(pData.dataUrl) 
-          }); 
-        }); 
-      });
+      mandatoryConfig.forEach((cfg, idx) => { state.photos[idx].forEach((pData, pIdx) => { filesToPack.push({ name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, blob: dataURItoUint8Array(pData.dataUrl) }); }); });
       filesToPack.unshift({ name: 'report_info.txt', blob: new TextEncoder().encode(emailBodyText) });
 
       let fileData = [], centralDir = [], offset = 0; const encoder = new TextEncoder();
@@ -775,6 +714,14 @@
       currentZipName = `${sanitizedSerial}_${dateStr}.zip`;
       currentZipBlob = new Blob([finalZipUint8], { type: "application/zip" });
 
+      // Защита: если Firebase еще не загружен или нет сети, используем локальное время телефона
+      let timeStampVal = Date.now();
+      try {
+        if (typeof firebase !== 'undefined' && firebase.database && firebase.database.ServerValue) {
+          timeStampVal = firebase.database.ServerValue.TIMESTAMP;
+        }
+      } catch (e) { console.log("Firebase timestamp fallback"); }
+
       const fbReportData = {
         objectName: state.objectName,
         address: state.address,
@@ -788,7 +735,7 @@
         controllerSeal: state.controllerSeal,
         gps: (state.coordinates && !state.coordinates.error) ? `${state.coordinates.lat.toFixed(6)}, ${state.coordinates.lng.toFixed(6)}` : 'Нет',
         date: formatDateTime(state.creationDate),
-        timestamp: firebase.database.ServerValue ? firebase.database.ServerValue.TIMESTAMP : Date.now()
+        timestamp: timeStampVal
       };
 
       function pushToFirebase(data) {
@@ -977,5 +924,9 @@
   modal.addEventListener('touchmove', (e) => { if (e.touches.length === 2 && startDist > 0) { const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY); scale = Math.min(Math.max(1, (dist / startDist)), 4); updateTransform(); } else if (e.touches.length === 1 && isDragging) { posX = e.touches[0].pageX - startX; posY = e.touches[0].pageY - startY; updateTransform(); } }, { passive: true });
   modal.addEventListener('touchend', (e) => { if (e.touches.length < 2) startDist = 0; if (e.touches.length === 0) isDragging = false; });
 </script>
+
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js" onload="initFirebase()"></script>
+
 </body>
 </html>
