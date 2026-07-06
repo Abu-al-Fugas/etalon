@@ -140,12 +140,6 @@
       </div>
 
       <div class="form-group">
-        <label class="required">Серийный № нового счетчика</label>
-        <div class="input-wrapper">
-          <input type="text" id="serialNumber" placeholder="Введите серийный номер">
-        </div>
-      </div>
-      <div class="form-group">
         <label class="required">Модель нового счетчика</label>
         <select id="meterModel">
           <option value="" disabled selected>Выберите модель...</option>
@@ -171,6 +165,14 @@
         <label class="required">Лицевой счет</label>
         <input type="text" id="accountNumber" placeholder="Пример: 123456789">
       </div>
+
+      <div class="form-group">
+        <label class="required">Подпись потребителя</label>
+        <div id="signatureWrapper" style="border: 1px solid #cbd5e1; border-radius: 12px; background: transparent; overflow: hidden; margin-bottom: 8px; touch-action: none;">
+          <canvas id="signatureCanvas" style="width: 100%; height: 120px; display: block;"></canvas>
+        </div>
+        <button type="button" id="clearSignatureBtn" class="secondary" style="font-size: 0.9rem; padding: 10px;">✏️ Очистить подпись</button>
+      </div>
       
       <button id="startReportBtn" style="margin-bottom: 12px;">▶ Начать фотоотчёт</button>
       <button id="openArchivesBtn" class="secondary">📁 Сохраненные архивы</button>
@@ -183,14 +185,14 @@
       <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">📍 <span id="displayAddress"></span></p>
       <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">👤 Потребитель: <span id="displayConsumerRole"></span> <span id="displayConsumer"></span> | Л/С: <span id="displayAccount"></span></p>
       <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">👤 Монтажник: <span id="displayInstaller"></span></p>
-      <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">⚙️ Модель: <span id="displayModel"></span> | 🔢 №: <span id="displaySerial"></span></p>
+      <p style="font-size: 0.8rem; color: #475569; margin-bottom: 4px;">⚙️ Модель: <span id="displayModel"></span></p>
       <div>
         <span style="font-size: 0.8rem; color: #475569;">🌍 GPS Координаты: </span>
         <span id="displayCoords" class="geo-status-badge geo-searching">Ожидание спутников...</span>
       </div>
     </div>
     <div class="card">
-      <h2>Загрузите фотографии</h2>
+      <h2>Загрузите фотографии и данные</h2>
       <div id="syncStatus" style="font-size: 0.8rem; text-align: center; color: #d97706; margin-bottom: 10px;" class="hidden">
         Внимание: Нет сети. Отчет будет сохранен локально и отправлен в базу позже.
       </div>
@@ -232,7 +234,7 @@
     </div>
   </div>
 
-  <footer>Друид_33 | Версия 3.5 (PWA)</footer>
+  <footer>Друид_33 | Версия 4.5 (PWA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -243,15 +245,6 @@
 <input type="file" id="globalFileInput" accept="image/*" multiple class="hidden">
 
 <script>
-  // Глобальное отслеживание фокуса на любых полях ввода для плавного подъема над клавиатурой (iOS)
-  document.addEventListener('focusin', function(e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
-      setTimeout(() => {
-        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300);
-    }
-  });
-
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => console.log('PWA Offline Ready'));
   }
@@ -268,7 +261,6 @@
 
   let fbDb = null;
   
-  // Безопасная инициализация базы данных
   function initFirebase() {
     if (typeof firebase !== 'undefined') {
       firebase.initializeApp(firebaseConfig);
@@ -311,7 +303,7 @@
     { title: "👮 Пломба контролера старого", prefix: "05_old_seal_controller", hasInput: true },
     { title: "⬅️ Направление старого счетчика", prefix: "06_old_gas_direction" },
     { title: "📦 Общий вид нового счётчика", prefix: "07_new_meter_view" },
-    { title: "🆕 Серийный № нового", prefix: "08_new_meter_serial" },
+    { title: "🆕 Серийный № нового", prefix: "08_new_meter_serial", hasSerialInput: true },
     { title: "📟 Показания нового", prefix: "09_new_meter_readings" },
     { title: "↗️ Направление нового счетчика", prefix: "10_new_gas_direction" },
     { title: "🛡️ Пломба нового счетчика", prefix: "11_new_seal" },
@@ -320,7 +312,7 @@
 
   let state = { 
     objectName: '', address: '', installerName: '', serialNumber: '', meterModel: '', 
-    consumerRole: '', consumerName: '', accountNumber: '', 
+    consumerRole: '', consumerName: '', accountNumber: '', signatureDataUrl: '',
     powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: '-', controllerSeal: '',
     coordinates: null, creationDate: null, 
     photos: Array.from({ length: mandatoryConfig.length }, () => []), 
@@ -334,15 +326,98 @@
   const archiveListContainer = document.getElementById('archiveListContainer'), multiActionBar = document.getElementById('multiActionBar');
   const syncStatus = document.getElementById('syncStatus');
 
+  // Управление Canvas подписи
+  const sigCanvas = document.getElementById('signatureCanvas');
+  const sigCtx = sigCanvas.getContext('2d', { willReadFrequently: true });
+  let isDrawingSig = false;
+
+  function initSignatureCanvas() {
+    const wrapperWidth = document.getElementById('signatureWrapper').clientWidth;
+    sigCanvas.width = wrapperWidth;
+    sigCanvas.height = 120;
+    sigCtx.lineWidth = 3;
+    sigCtx.strokeStyle = '#1565C0'; // Синий цвет
+    sigCtx.lineCap = 'round';
+    sigCtx.lineJoin = 'round';
+    sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+    
+    // Восстановление подписи при перезагрузке холста
+    if (state.signatureDataUrl) {
+      const img = new Image();
+      img.onload = () => sigCtx.drawImage(img, 0, 0);
+      img.src = state.signatureDataUrl;
+    }
+  }
+
+  function getSigPos(e) {
+    const rect = sigCanvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function startSig(e) {
+    e.preventDefault();
+    isDrawingSig = true;
+    const pos = getSigPos(e);
+    sigCtx.beginPath();
+    sigCtx.moveTo(pos.x, pos.y);
+  }
+
+  function drawSig(e) {
+    e.preventDefault();
+    if (!isDrawingSig) return;
+    const pos = getSigPos(e);
+    sigCtx.lineTo(pos.x, pos.y);
+    sigCtx.stroke();
+  }
+
+  function stopSig(e) {
+    if (e) e.preventDefault();
+    if (isDrawingSig) {
+      isDrawingSig = false;
+      state.signatureDataUrl = sigCanvas.toDataURL('image/png');
+      saveDraft();
+    }
+  }
+
+  sigCanvas.addEventListener('mousedown', startSig);
+  sigCanvas.addEventListener('mousemove', drawSig);
+  sigCanvas.addEventListener('mouseup', stopSig);
+  sigCanvas.addEventListener('mouseout', stopSig);
+  sigCanvas.addEventListener('touchstart', startSig, { passive: false });
+  sigCanvas.addEventListener('touchmove', drawSig, { passive: false });
+  sigCanvas.addEventListener('touchend', stopSig, { passive: false });
+  sigCanvas.addEventListener('touchcancel', stopSig, { passive: false });
+
+  document.getElementById('clearSignatureBtn').addEventListener('click', () => {
+    sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+    state.signatureDataUrl = '';
+    saveDraft();
+  });
+
+  function isSignatureEmpty() {
+    const imgData = sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height);
+    // Проверяем альфа-канал на наличие непрозрачных пикселей (каждый 4-й байт)
+    for (let i = 3; i < imgData.data.length; i += 4) {
+      if (imgData.data[i] !== 0) return false;
+    }
+    return true;
+  }
+
   let savedArchives = []; let selectedArchives = new Set(); let isMultiSelectMode = false;
 
-window.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('DOMContentLoaded', () => {
     const savedName = localStorage.getItem('installerName');
     if (savedName) document.getElementById('installerName').value = savedName;
     
-    startBackgroundGeoCollection(); // Запрос геолокации сразу
-    renderGasPhotos(); // <-- Добавлено для отображения кнопки "+Добавить" на всех устройствах
+    startBackgroundGeoCollection(); 
+    renderGasPhotos(); 
+    
+    // Инициализируем канвас сразу после загрузки контента
+    setTimeout(initSignatureCanvas, 100);
   });
+  window.addEventListener('resize', initSignatureCanvas);
 
   function syncPendingRecords() {
     if (!navigator.onLine || !db || !fbDb) return;
@@ -409,6 +484,7 @@ window.addEventListener('DOMContentLoaded', () => {
       objectName: state.objectName, address: state.address, installerName: state.installerName,
       serialNumber: state.serialNumber, meterModel: state.meterModel,
       consumerRole: state.consumerRole, consumerName: state.consumerName, accountNumber: state.accountNumber,
+      signatureDataUrl: state.signatureDataUrl,
       powerKw: state.powerKw, powerM3: state.powerM3, powerPg: state.powerPg,
       totalPower: state.totalPower, suggestedMeter: state.suggestedMeter, controllerSeal: state.controllerSeal,
       coordinates: state.coordinates, creationDate: state.creationDate, photos: state.photos, gasPhotos: state.gasPhotos
@@ -440,12 +516,12 @@ window.addEventListener('DOMContentLoaded', () => {
         state.powerKw = d.powerKw || ''; state.powerM3 = d.powerM3 || ''; state.powerPg = d.powerPg || '';
         state.totalPower = d.totalPower || '0.00'; state.suggestedMeter = d.suggestedMeter || 'Вычислите мощность';
         state.controllerSeal = d.controllerSeal || '';
+        state.signatureDataUrl = d.signatureDataUrl || '';
         state.coordinates = d.coordinates || null; state.creationDate = d.creationDate || null;
 
         document.getElementById('objectName').value = state.objectName;
         document.getElementById('address').value = state.address;
         document.getElementById('installerName').value = state.installerName;
-        document.getElementById('serialNumber').value = state.serialNumber;
         document.getElementById('meterModel').value = state.meterModel;
         document.getElementById('consumerRole').value = state.consumerRole;
         document.getElementById('consumerName').value = state.consumerName;
@@ -455,6 +531,12 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('powerPg').value = state.powerPg;
         document.getElementById('powerTotal').innerText = state.totalPower;
         document.getElementById('suggestedMeter').innerText = state.suggestedMeter;
+
+        if (state.signatureDataUrl) {
+          const img = new Image();
+          img.onload = () => sigCtx.drawImage(img, 0, 0);
+          img.src = state.signatureDataUrl;
+        }
 
         if (d.photos) {
           state.photos = d.photos; 
@@ -474,7 +556,6 @@ window.addEventListener('DOMContentLoaded', () => {
           document.getElementById('displayAccount').innerText = state.accountNumber;
           document.getElementById('displayInstaller').innerText = state.installerName;
           document.getElementById('displayModel').innerText = state.meterModel;
-          document.getElementById('displaySerial').innerText = state.serialNumber;
           
           if (state.coordinates && !state.coordinates.error) {
             displayCoords.className = "geo-status-badge geo-success";
@@ -490,7 +571,7 @@ window.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  ['objectName', 'address', 'installerName', 'serialNumber', 'consumerRole', 'consumerName', 'accountNumber'].forEach(id => {
+  ['objectName', 'address', 'installerName', 'consumerRole', 'consumerName', 'accountNumber'].forEach(id => {
     document.getElementById(id).addEventListener('input', (e) => {
       state[id] = e.target.value.trim();
       saveDraft();
@@ -539,7 +620,6 @@ window.addEventListener('DOMContentLoaded', () => {
     state.objectName = document.getElementById('objectName').value.trim(); 
     state.address = document.getElementById('address').value.trim(); 
     state.installerName = document.getElementById('installerName').value.trim(); 
-    state.serialNumber = document.getElementById('serialNumber').value.trim(); 
     state.meterModel = document.getElementById('meterModel').value.trim();
     state.consumerRole = document.getElementById('consumerRole').value.trim();
     state.consumerName = document.getElementById('consumerName').value.trim();
@@ -556,10 +636,18 @@ window.addEventListener('DOMContentLoaded', () => {
       alert("Добавьте хотя бы одно фото газовых приборов!"); return;
     }
 
-    if (!state.objectName || !state.address || !state.installerName || !state.serialNumber || !state.meterModel || !state.consumerRole || !state.consumerName || !state.accountNumber) { 
+    if (!state.objectName || !state.address || !state.installerName || !state.meterModel || !state.consumerRole || !state.consumerName || !state.accountNumber) { 
       alert("Заполните обязательные поля!"); return; 
     }
+
+    // Проверка наличия подписи
+    if (isSignatureEmpty()) {
+      alert("Потребитель должен поставить подпись!"); return;
+    }
     
+    // Сохранение подписи перед переходом
+    state.signatureDataUrl = sigCanvas.toDataURL('image/png');
+
     localStorage.setItem('installerName', state.installerName);
     formScreen.classList.add('hidden'); checklistScreen.classList.remove('hidden');
     
@@ -570,7 +658,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('displayAccount').innerText = state.accountNumber;
     document.getElementById('displayInstaller').innerText = state.installerName;
     document.getElementById('displayModel').innerText = state.meterModel;
-    document.getElementById('displaySerial').innerText = state.serialNumber;
     
     if (!navigator.onLine) syncStatus.classList.remove('hidden');
     
@@ -593,6 +680,18 @@ window.addEventListener('DOMContentLoaded', () => {
         inputDiv.innerHTML = `<input type="text" placeholder="Введите номер пломбы" value="${state.controllerSeal}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 0.9rem;">`;
         const inputField = inputDiv.querySelector('input');
         inputField.addEventListener('input', (e) => { state.controllerSeal = e.target.value.trim(); saveDraft(); });
+        item.appendChild(inputDiv);
+      }
+      
+      if (cfg.hasSerialInput) {
+        const inputDiv = document.createElement('div');
+        inputDiv.innerHTML = `<input type="text" placeholder="Введите серийный номер" value="${state.serialNumber || ''}" inputmode="numeric" pattern="[0-9]*" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 0.9rem;">`;
+        const inputField = inputDiv.querySelector('input');
+        inputField.addEventListener('input', (e) => { 
+          state.serialNumber = e.target.value.trim(); 
+          saveDraft();
+          validateForm(); // обновляем проверку кнопки генерации
+        });
         item.appendChild(inputDiv);
       }
 
@@ -650,7 +749,12 @@ window.addEventListener('DOMContentLoaded', () => {
     else { state.photos[configIdx].splice(photoIdx, 1); renderChecklist(); }
     saveDraft(); 
   }
-  function validateForm() { generateBtn.disabled = !state.photos.every(arr => arr.length > 0); }
+  
+  function validateForm() { 
+    const allPhotosExist = state.photos.every(arr => arr.length > 0);
+    const serialNumberFilled = state.serialNumber && state.serialNumber.trim() !== '';
+    generateBtn.disabled = !(allPhotosExist && serialNumberFilled); 
+  }
 
   function dataURItoUint8Array(dataURI) {
     const base64 = dataURI.split(',')[1];
@@ -695,7 +799,13 @@ window.addEventListener('DOMContentLoaded', () => {
       });
 
       mandatoryConfig.forEach((cfg, idx) => { state.photos[idx].forEach((pData, pIdx) => { filesToPack.push({ name: state.photos[idx].length === 1 ? `${cfg.prefix}.jpg` : `${cfg.prefix}_${pIdx + 1}.jpg`, blob: dataURItoUint8Array(pData.dataUrl) }); }); });
+      
       filesToPack.unshift({ name: 'report_info.txt', blob: new TextEncoder().encode(emailBodyText) });
+      
+      // Добавляем подпись потребителя в архив
+      if (state.signatureDataUrl) {
+        filesToPack.push({ name: 'signature.png', blob: dataURItoUint8Array(state.signatureDataUrl) });
+      }
 
       let fileData = [], centralDir = [], offset = 0; const encoder = new TextEncoder();
       for (let i = 0; i < filesToPack.length; i++) {
@@ -715,7 +825,6 @@ window.addEventListener('DOMContentLoaded', () => {
       currentZipName = `${sanitizedSerial}_${dateStr}.zip`;
       currentZipBlob = new Blob([finalZipUint8], { type: "application/zip" });
 
-      // Защита: если Firebase еще не загружен или нет сети, используем локальное время телефона
       let timeStampVal = Date.now();
       try {
         if (typeof firebase !== 'undefined' && firebase.database && firebase.database.ServerValue) {
@@ -777,9 +886,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('resetAllBtn').addEventListener('click', () => {
     state.photos.forEach(arr => { arr.forEach(p => URL.revokeObjectURL(p.previewUrl)); });
-    state = { objectName: '', address: '', installerName: localStorage.getItem('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: 'Вычислите мощность', controllerSeal: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), gasPhotos: [], currentActiveIndex: null };
+    state = { objectName: '', address: '', installerName: localStorage.getItem('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', signatureDataUrl: '', powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: 'Вычислите мощность', controllerSeal: '', coordinates: null, creationDate: null, photos: Array.from({ length: mandatoryConfig.length }, () => []), gasPhotos: [], currentActiveIndex: null };
     currentZipBlob = null; currentZipName = "";
-    document.getElementById('objectName').value = ''; document.getElementById('address').value = ''; document.getElementById('serialNumber').value = ''; document.getElementById('meterModel').value = ''; document.getElementById('consumerRole').value = ''; document.getElementById('consumerName').value = ''; document.getElementById('accountNumber').value = ''; document.getElementById('powerKw').value = ''; document.getElementById('powerM3').value = ''; document.getElementById('powerPg').value = ''; document.getElementById('powerTotal').innerText = '0.00'; document.getElementById('suggestedMeter').innerText = 'Вычислите мощность';
+    document.getElementById('objectName').value = ''; document.getElementById('address').value = ''; document.getElementById('meterModel').value = ''; document.getElementById('consumerRole').value = ''; document.getElementById('consumerName').value = ''; document.getElementById('accountNumber').value = ''; document.getElementById('powerKw').value = ''; document.getElementById('powerM3').value = ''; document.getElementById('powerPg').value = ''; document.getElementById('powerTotal').innerText = '0.00'; document.getElementById('suggestedMeter').innerText = 'Вычислите мощность';
+    
+    // Очищаем канвас подписи
+    sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
     
     clearDraft();
     renderGasPhotos();
