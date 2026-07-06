@@ -169,7 +169,7 @@
       <div class="form-group">
         <label class="required">Подпись потребителя</label>
         <div id="signatureWrapper" style="border: 1px solid #cbd5e1; border-radius: 12px; background: transparent; overflow: hidden; margin-bottom: 8px; touch-action: none;">
-          <canvas id="signatureCanvas" style="width: 100%; height: 120px; display: block;"></canvas>
+          <canvas id="signatureCanvas" style="width: 100%; height: 145px; display: block;"></canvas>
         </div>
         <button type="button" id="clearSignatureBtn" class="secondary" style="font-size: 0.9rem; padding: 10px;">✏️ Очистить подпись</button>
       </div>
@@ -234,7 +234,7 @@
     </div>
   </div>
 
-  <footer>Druid_33 | Версия 4.5 (PWA)</footer>
+  <footer>Друид_33 | Версия 4.6 (PWA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -334,7 +334,7 @@
   function initSignatureCanvas() {
     const wrapperWidth = document.getElementById('signatureWrapper').clientWidth;
     sigCanvas.width = wrapperWidth;
-    sigCanvas.height = 120;
+    sigCanvas.height = 145; // Увеличенная высота
     sigCtx.lineWidth = 3;
     sigCtx.strokeStyle = '#1565C0'; // Синий цвет
     sigCtx.lineCap = 'round';
@@ -411,7 +411,6 @@
     const savedName = localStorage.getItem('installerName');
     if (savedName) document.getElementById('installerName').value = savedName;
     
-    startBackgroundGeoCollection(); 
     renderGasPhotos(); 
     
     // Инициализируем канвас сразу после загрузки контента
@@ -556,17 +555,16 @@
           document.getElementById('displayAccount').innerText = state.accountNumber;
           document.getElementById('displayInstaller').innerText = state.installerName;
           document.getElementById('displayModel').innerText = state.meterModel;
-          
-          if (state.coordinates && !state.coordinates.error) {
-            displayCoords.className = "geo-status-badge geo-success";
-            displayCoords.innerText = `${state.coordinates.lat.toFixed(6)}, ${state.coordinates.lng.toFixed(6)} (~${Math.round(state.coordinates.acc)}м)`;
-          } else if (state.coordinates && state.coordinates.error) {
-            displayCoords.className = "geo-status-badge geo-error";
-            displayCoords.innerText = state.coordinates.error;
-          }
-          
           renderChecklist();
         }
+      }
+      
+      // Логика GPS: ищем только если еще нет успешных координат в черновике
+      if (state.coordinates && !state.coordinates.error) {
+        displayCoords.className = "geo-status-badge geo-success";
+        displayCoords.innerText = `${state.coordinates.lat.toFixed(6)}, ${state.coordinates.lng.toFixed(6)} (~${Math.round(state.coordinates.acc)}м)`;
+      } else {
+        startBackgroundGeoCollection();
       }
     };
   }
@@ -581,13 +579,26 @@
   function formatDateTime(isoString) { if (!isoString) return '—'; const d = new Date(isoString); return d.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}); }
 
   function startBackgroundGeoCollection() {
-    if (!navigator.geolocation) { displayCoords.className = "geo-status-badge geo-error"; displayCoords.innerText = "GPS недоступен"; return; }
+    if (!navigator.geolocation) { 
+      state.coordinates = { error: "GPS недоступен" };
+      displayCoords.className = "geo-status-badge geo-error"; 
+      displayCoords.innerText = "GPS недоступен"; 
+      saveDraft();
+      return; 
+    }
+    
     displayCoords.className = "geo-status-badge geo-searching"; displayCoords.innerText = "Поиск спутников GPS...";
+    
+    // Поиск длится до 25 секунд
     navigator.geolocation.getCurrentPosition((pos) => {
       state.coordinates = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
       displayCoords.className = "geo-status-badge geo-success"; displayCoords.innerText = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (~${Math.round(pos.coords.accuracy)}м)`;
       saveDraft(); 
-    }, () => { displayCoords.className = "geo-status-badge geo-error"; displayCoords.innerText = "Включите GPS в настройках Safari."; }, { enableHighAccuracy: true, timeout: 10000 });
+    }, () => { 
+      state.coordinates = { error: "Не удалось получить GPS" };
+      displayCoords.className = "geo-status-badge geo-error"; displayCoords.innerText = "Включите GPS в настройках Safari.";
+      saveDraft();
+    }, { enableHighAccuracy: true, timeout: 25000 });
   }
 
   function renderGasPhotos() {
@@ -895,6 +906,9 @@
     
     clearDraft();
     renderGasPhotos();
+    
+    // Запускаем поиск геолокации для нового объекта
+    startBackgroundGeoCollection();
     
     manualSendInstructions.classList.add('hidden'); shareTextBtn.classList.add('hidden'); resetGenBtn(); checklistScreen.classList.add('hidden'); formScreen.classList.remove('hidden');
   });
