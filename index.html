@@ -169,7 +169,7 @@
       <div class="form-group">
         <label class="required">Подпись потребителя</label>
         <div id="signatureWrapper" style="border: 1px solid #cbd5e1; border-radius: 12px; background: transparent; overflow: hidden; margin-bottom: 8px; touch-action: none;">
-          <canvas id="signatureCanvas" style="width: 100%; height: 145px; display: block;"></canvas>
+          <canvas id="signatureCanvas" style="width: 100%; height: 189px; display: block;"></canvas>
         </div>
         <button type="button" id="clearSignatureBtn" class="secondary" style="font-size: 0.9rem; padding: 10px;">✏️ Очистить подпись</button>
       </div>
@@ -334,7 +334,7 @@
   function initSignatureCanvas() {
     const wrapperWidth = document.getElementById('signatureWrapper').clientWidth;
     sigCanvas.width = wrapperWidth;
-    sigCanvas.height = 145; // Увеличенная высота
+    sigCanvas.height = 189; // Увеличенная высота
     sigCtx.lineWidth = 3;
     sigCtx.strokeStyle = '#1565C0'; // Синий цвет
     sigCtx.lineCap = 'round';
