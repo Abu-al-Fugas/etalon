@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="Эталон Стандарт">
   <link rel="apple-touch-icon" href="icon.png">
   
+  <!-- Библиотека для сканирования QR и штрихкодов в PWA -->
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
@@ -246,9 +247,8 @@
         <button id="generateReportBtn" disabled>📦 Сформировать и сохранить архив</button>
         
         <div id="manualSendInstructions" class="instruction-box hidden">
-          <strong>✓ Архив успешно сохранен в память PWA!</strong><br>
-          <span id="savedFileNameSpan" style="font-size:0.85rem; color:#475569;"></span><br><br>
-          Нажмите синюю кнопку ниже, чтобы отправить его в мессенджер через шторку iOS.
+          <strong>✓ Архив сохранен!</strong><br>
+          <span id="savedFileNameSpan" style="font-size:0.85rem; color:#475569;"></span>
         </div>
 
         <button id="shareTextBtn" class="share-btn hidden">✉️ Отправить сейчас</button>
@@ -276,14 +276,16 @@
     </div>
   </div>
 
-  <footer>Друид_33 | Версия 4.8 (PWA Scanner)</footer>
+  <footer>Друид_33 | Версия 4.8.1 (PWA Scanner)</footer>
 </div>
 
+<!-- Модальное окно для просмотра фото -->
 <div id="photoModal" class="modal">
   <div class="modal-close" id="modalClose">&times;</div>
   <div class="modal-wrapper" id="modalWrapper"><img src="" class="modal-img" id="modalImg" alt="Просмотр"></div>
 </div>
 
+<!-- Модальное окно для сканера штрихкодов -->
 <div id="scannerModal">
   <div id="scannerModalClose">&times;</div>
   <div id="reader"></div>
@@ -1344,7 +1346,6 @@
       const link = document.createElement('a'); link.href = URL.createObjectURL(f.blob); link.download = f.name;
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
     });
-    alert("Архив загружен на iPhone! Откройте мессенджер, нажмите скрепку -> 'Файл' и отправьте его из папки 'Загрузки'.");
     if (isMultiSelectMode) { selectedArchives.clear(); isMultiSelectMode = false; renderArchiveList(); }
   }
 
