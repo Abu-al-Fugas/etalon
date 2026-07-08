@@ -106,9 +106,6 @@
     .radio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .radio-card { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #cbd5e1; padding: 10px 8px; border-radius: 8px; font-size: 0.9rem; color: #334155; cursor: pointer; }
     .radio-card input[type="radio"] { width: 18px; height: 18px; accent-color: #2b7a4b; flex-shrink: 0; margin: 0; }
-
-    #signatureWrapper { border: 1px solid #ef4444; border-radius: 12px; background: transparent; overflow: hidden; margin-bottom: 8px; touch-action: none; transition: border-color 0.3s; }
-    #signatureWrapper.valid { border-color: #22c55e !important; }
   </style>
 </head>
 <body>
@@ -209,10 +206,11 @@
 
       <div class="form-group">
         <label class="field-label required">Подпись потребителя</label>
-        <div id="signatureWrapper">
-          <canvas id="signatureCanvas" style="width: 100%; height: 189px; display: block;"></canvas>
+        <div id="signatureWrapper" style="padding: 12px; text-align: center; border: 1px solid #ef4444; border-radius: 12px; background: transparent; transition: border-color 0.3s; margin-bottom: 8px;">
+          <span id="signatureStatusText" style="display:block; margin-bottom: 8px; color: #ef4444; font-weight: 600;">Подпись отсутствует</span>
+          <img id="signaturePreview" style="width: 100%; max-height: 100px; object-fit: contain; margin-bottom: 12px; display: none;" />
+          <button type="button" id="openSignatureBtn" class="secondary" style="font-size: 0.9rem; padding: 10px;">✍️ Открыть поле для подписи</button>
         </div>
-        <button type="button" id="clearSignatureBtn" class="secondary" style="font-size: 0.9rem; padding: 10px;">✏️ Очистить подпись</button>
       </div>
       
       <button id="startReportBtn" style="margin-bottom: 12px;">▶ Начать фотоотчёт</button>
@@ -275,7 +273,7 @@
     </div>
   </div>
 
-  <footer>iPhone | Версия 1.1.1 (Green)</footer>
+  <footer>iPhone | Версия 2.2.2 (Frost)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -287,6 +285,20 @@
   <div id="scannerModalClose">&times;</div>
   <div id="reader"></div>
   <div class="scanner-tip">Наведите камеру на QR или штрихкод.<br>Фокус может занять несколько секунд.</div>
+</div>
+
+<div id="signatureModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; padding: 16px; flex-direction: column;">
+  <div style="background: white; width: 100%; max-width: 500px; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+    <h2 style="text-align: center; margin: 0; font-size: 1.2rem;">Поставьте подпись</h2>
+    <div style="border: 2px solid #cbd5e1; border-radius: 12px; touch-action: none; background: #fff; overflow: hidden; position: relative;" id="canvasContainer">
+      <canvas id="signatureCanvas" style="width: 100%; height: 450px; display: block;"></canvas>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button type="button" id="clearSignatureBtn" class="danger-btn" style="flex: 1; padding: 12px; font-size: 0.95rem;">Очистить</button>
+      <button type="button" id="saveSignatureBtn" style="flex: 1; padding: 12px; font-size: 0.95rem;">✅ Сохранить</button>
+    </div>
+    <button type="button" id="closeSignatureModalBtn" class="secondary" style="padding: 12px; font-size: 0.95rem;">Отмена</button>
+  </div>
 </div>
 
 <input type="file" id="globalFileInput" accept="image/*" multiple class="hidden">
@@ -403,6 +415,24 @@
   const multiActionBar = document.getElementById('multiActionBar');
   const syncStatus = document.getElementById('syncStatus');
 
+  function updateSignaturePreview() {
+    const preview = document.getElementById('signaturePreview');
+    const statusText = document.getElementById('signatureStatusText');
+    if(preview && statusText) {
+        if (state.signatureDataUrl) {
+            preview.src = state.signatureDataUrl;
+            preview.style.display = 'block';
+            statusText.innerText = 'Подпись сохранена';
+            statusText.style.color = '#15803d'; 
+        } else {
+            preview.src = '';
+            preview.style.display = 'none';
+            statusText.innerText = 'Подпись отсутствует';
+            statusText.style.color = '#ef4444'; 
+        }
+    }
+  }
+
   function updateMainValidation() {
     ['objectName', 'address', 'installerName', 'consumerRole', 'consumerName', 'accountNumber'].forEach(id => {
       const el = document.getElementById(id);
@@ -415,7 +445,10 @@
     document.getElementById('powerM3').classList.toggle('valid', pValid);
     document.getElementById('powerPg').classList.toggle('valid', pValid);
     const sigWrap = document.getElementById('signatureWrapper');
-    if(sigWrap) sigWrap.classList.toggle('valid', !!state.signatureDataUrl);
+    if(sigWrap) {
+      sigWrap.classList.toggle('valid', !!state.signatureDataUrl);
+      updateSignaturePreview();
+    }
   }
 
   // Подпись (Canvas)
@@ -424,20 +457,52 @@
   let isDrawingSig = false;
 
   function initSignatureCanvas() {
-    const wrapperWidth = document.getElementById('signatureWrapper').clientWidth;
-    sigCanvas.width = wrapperWidth || 600; sigCanvas.height = 189; sigCtx.lineWidth = 3; sigCtx.strokeStyle = '#1565C0'; sigCtx.lineCap = 'round'; sigCtx.lineJoin = 'round'; sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
-    if (state.signatureDataUrl) { const img = new Image(); img.onload = () => sigCtx.drawImage(img, 0, 0); img.src = state.signatureDataUrl; }
+    const container = document.getElementById('canvasContainer');
+    sigCanvas.width = container.clientWidth || (window.innerWidth - 68);
+    sigCanvas.height = 450; 
+    sigCtx.lineWidth = 3; 
+    sigCtx.strokeStyle = '#1565C0'; 
+    sigCtx.lineCap = 'round'; 
+    sigCtx.lineJoin = 'round'; 
+    sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+    if (state.signatureDataUrl) { 
+      const img = new Image(); 
+      img.onload = () => sigCtx.drawImage(img, 0, 0); 
+      img.src = state.signatureDataUrl; 
+    }
   }
 
   function getSigPos(e) { const rect = sigCanvas.getBoundingClientRect(); const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY; return { x: clientX - rect.left, y: clientY - rect.top }; }
   function startSig(e) { e.preventDefault(); isDrawingSig = true; const pos = getSigPos(e); sigCtx.beginPath(); sigCtx.moveTo(pos.x, pos.y); }
   function drawSig(e) { e.preventDefault(); if (!isDrawingSig) return; const pos = getSigPos(e); sigCtx.lineTo(pos.x, pos.y); sigCtx.stroke(); }
-  function stopSig(e) { if (e) e.preventDefault(); if (isDrawingSig) { isDrawingSig = false; state.signatureDataUrl = sigCanvas.toDataURL('image/png'); saveDraft(); updateMainValidation(); } }
+  function stopSig(e) { if (e) e.preventDefault(); if (isDrawingSig) { isDrawingSig = false; } }
 
   sigCanvas.addEventListener('mousedown', startSig); sigCanvas.addEventListener('mousemove', drawSig); sigCanvas.addEventListener('mouseup', stopSig); sigCanvas.addEventListener('mouseout', stopSig);
   sigCanvas.addEventListener('touchstart', startSig, { passive: false }); sigCanvas.addEventListener('touchmove', drawSig, { passive: false }); sigCanvas.addEventListener('touchend', stopSig, { passive: false }); sigCanvas.addEventListener('touchcancel', stopSig, { passive: false });
 
-  document.getElementById('clearSignatureBtn').addEventListener('click', () => { sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); state.signatureDataUrl = ''; saveDraft(); updateMainValidation(); });
+  document.getElementById('openSignatureBtn').addEventListener('click', () => {
+    document.getElementById('signatureModal').style.display = 'flex';
+    setTimeout(initSignatureCanvas, 50);
+  });
+
+  document.getElementById('closeSignatureModalBtn').addEventListener('click', () => {
+    document.getElementById('signatureModal').style.display = 'none';
+  });
+
+  document.getElementById('clearSignatureBtn').addEventListener('click', () => { 
+    sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); 
+  });
+
+  document.getElementById('saveSignatureBtn').addEventListener('click', () => {
+    if (isSignatureEmpty()) {
+        state.signatureDataUrl = '';
+    } else {
+        state.signatureDataUrl = sigCanvas.toDataURL('image/png');
+    }
+    saveDraft();
+    updateMainValidation();
+    document.getElementById('signatureModal').style.display = 'none';
+  });
 
   function isSignatureEmpty() {
     const imgData = sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height);
@@ -446,9 +511,13 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     const savedName = localStorage.getItem('installerName'); if (savedName) document.getElementById('installerName').value = savedName;
-    renderGasPhotos(); setTimeout(initSignatureCanvas, 100); updateMainValidation();
+    renderGasPhotos(); updateMainValidation();
   });
-  window.addEventListener('resize', initSignatureCanvas);
+  window.addEventListener('resize', () => {
+    if(document.getElementById('signatureModal').style.display === 'flex') {
+      initSignatureCanvas();
+    }
+  });
 
   function formatDateTime(isoString) { if (!isoString) return '—'; const d = new Date(isoString); return d.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}); }
   function dataURItoUint8Array(dataURI) { const base64 = dataURI.split(',')[1]; const binary_string = window.atob(base64); const len = binary_string.length; const bytes = new Uint8Array(len); for (let i = 0; i < len; i++) { bytes[i] = binary_string.charCodeAt(i); } return bytes; }
@@ -480,7 +549,7 @@
         document.getElementById('objectName').value = state.objectName; document.getElementById('address').value = state.address; document.getElementById('installerName').value = state.installerName; document.getElementById('meterModel').value = state.meterModel; document.getElementById('consumerRole').value = state.consumerRole; document.getElementById('consumerName').value = state.consumerName; document.getElementById('accountNumber').value = state.accountNumber; document.getElementById('powerKw').value = state.powerKw; document.getElementById('powerM3').value = state.powerM3; document.getElementById('powerPg').value = state.powerPg; document.getElementById('powerTotal').innerText = state.totalPower; document.getElementById('suggestedMeter').innerText = state.suggestedMeter;
         if (state.accountNumber === "Нет") document.getElementById('noAccountCb').checked = true;
         if (state.uirgLocation) { const radio = document.querySelector(`input[name="uirg"][value="${state.uirgLocation}"]`); if (radio) radio.checked = true; }
-        if (state.signatureDataUrl) { const img = new Image(); img.onload = () => sigCtx.drawImage(img, 0, 0); img.src = state.signatureDataUrl; }
+        
         updateMainValidation();
         if (state.creationDate) {
           formScreen.classList.add('hidden'); checklistScreen.classList.remove('hidden');
@@ -623,7 +692,16 @@
           <button class="scan-btn" type="button" aria-label="Сканировать" style="flex-shrink: 0; width: 42px; height: 42px; border-radius: 10px; margin: 0; padding: 0;">📷</button>`;
         const inputField = inputDiv.querySelector('input');
         inputField.addEventListener('input', (e) => { state.serialNumber = e.target.value.trim(); e.target.classList.toggle('valid', state.serialNumber !== ''); saveDraft(); validateForm(); });
-        inputDiv.querySelector('.scan-btn').addEventListener('click', () => { startWebScanner((resultText) => { inputField.value = resultText; state.serialNumber = resultText; inputField.classList.add('valid'); saveDraft(); validateForm(); }); });
+        inputDiv.querySelector('.scan-btn').addEventListener('click', () => { 
+          startWebScanner((resultText) => { 
+            let parsedText = resultText.split(';')[0]; // Отсекаем все после символа ;
+            inputField.value = parsedText; 
+            state.serialNumber = parsedText; 
+            inputField.classList.add('valid'); 
+            saveDraft(); 
+            validateForm(); 
+          }); 
+        });
         item.appendChild(inputDiv);
       }
 
@@ -783,9 +861,9 @@
     if (!state.objectName || !state.address || !state.uirgLocation || !state.installerName || !state.meterModel || !state.consumerRole || !state.consumerName || !state.accountNumber) { alert("Заполните ВСЕ обязательные поля, выделенные красной рамкой!"); updateMainValidation(); return; }
     if (kw === 0 && m3 === 0 && pg === 0) { alert("Для подсчета мощности заполните хотя бы одно из полей (кВт, m³/ч или ПГ)!"); return; }
     if (state.gasPhotos.length === 0) { alert("Добавьте хотя бы одно фото газовых приборов!"); return; }
-    if (isSignatureEmpty()) { alert("Потребитель должен поставить подпись!"); return; }
+    if (!state.signatureDataUrl) { alert("Потребитель должен поставить подпись!"); return; }
     
-    state.signatureDataUrl = sigCanvas.toDataURL('image/png'); localStorage.setItem('installerName', state.installerName);
+    localStorage.setItem('installerName', state.installerName);
     formScreen.classList.add('hidden'); checklistScreen.classList.remove('hidden');
     document.getElementById('displayObject').innerText = state.objectName; document.getElementById('displayAddress').innerText = state.address; document.getElementById('displayUirg').innerText = state.uirgLocation; document.getElementById('displayConsumerRole').innerText = state.consumerRole; document.getElementById('displayConsumer').innerText = state.consumerName; document.getElementById('displayAccount').innerText = state.accountNumber; document.getElementById('displayInstaller').innerText = state.installerName; document.getElementById('displayModel').innerText = state.meterModel;
     if (!navigator.onLine) syncStatus.classList.remove('hidden');
