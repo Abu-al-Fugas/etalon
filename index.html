@@ -274,7 +274,7 @@
     </div>
   </div>
 
-  <footer>iPhone | Версия 3.3.3 (Zero)</footer>
+  <footer>iPhone | Версия 4.4.4 (Monday)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -617,7 +617,6 @@
     else if (total <= 109.2) { suggested = "Счетчик: G65 (запас " + (110 - total).toFixed(2) + ")"; modelValue = "CMT- Комплекс G65"; }
     else { suggested = "Требуется промышленный"; modelValue = ""; }
     state.suggestedMeter = suggested; document.getElementById('suggestedMeter').innerText = suggested;
-    if (modelValue) { document.getElementById('meterModel').value = modelValue; state.meterModel = modelValue; } else { document.getElementById('meterModel').value = ""; state.meterModel = ""; }
     saveDraft(); updateMainValidation();
   }
 
@@ -663,12 +662,27 @@
 
       if (cfg.hasOldModelInput) {
         const inputDiv = document.createElement('div'); inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
+        const knownOptions = ["СГМН-1 G6", "BK-G6", "СГМН-МТ1 G6", "BK-G10", "BK-G16", "BK-G25", "BK-G40", "Novator G6 РЛ", "СГБ Смарт G6"];
+        const isKnownModel = knownOptions.includes(state.oldMeterModel);
+
+        let optionsHtml = `<option value="" disabled ${!isKnownModel ? 'selected' : ''}>Выбрать...</option>`;
+        knownOptions.forEach(opt => { optionsHtml += `<option value="${opt}" ${state.oldMeterModel === opt ? 'selected' : ''}>${opt}</option>`; });
+
         inputDiv.innerHTML = `<input type="text" placeholder="Модель" value="${state.oldMeterModel}" class="${state.oldMeterModel ? 'valid' : ''}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;">
           <select class="${state.oldMeterModel ? 'valid' : ''}" style="flex-shrink: 0; width: 140px; padding: 8px; border-radius: 10px; font-size: 0.85rem; background-color: #f8fafc;">
-            <option value="" disabled ${!state.oldMeterModel ? 'selected' : ''}>Выбрать...</option> <option value="СГМН-1 G6">СГМН-1 G6</option> <option value="BK-G6">BK-G6</option> <option value="СГМН-МТ1 G6">СГМН-МТ1 G6</option> <option value="BK-G10">BK-G10</option> <option value="BK-G16">BK-G16</option> <option value="BK-G25">BK-G25</option> <option value="BK-G40">BK-G40</option> <option value="Novator G6 РЛ">Novator G6 РЛ</option> <option value="СГБ Смарт G6">СГБ Смарт G6</option>
+            ${optionsHtml}
           </select>`;
+        
         const inputField = inputDiv.querySelector('input'); const selectField = inputDiv.querySelector('select');
-        inputField.addEventListener('input', (e) => { state.oldMeterModel = e.target.value.trim(); inputField.classList.toggle('valid', state.oldMeterModel !== ''); selectField.classList.toggle('valid', state.oldMeterModel !== ''); saveDraft(); validateForm(); });
+        
+        inputField.addEventListener('input', (e) => { 
+          state.oldMeterModel = e.target.value.trim(); 
+          inputField.classList.toggle('valid', state.oldMeterModel !== ''); 
+          if (knownOptions.includes(state.oldMeterModel)) { selectField.value = state.oldMeterModel; } else { selectField.value = ""; }
+          selectField.classList.toggle('valid', state.oldMeterModel !== ''); 
+          saveDraft(); validateForm(); 
+        });
+        
         selectField.addEventListener('change', (e) => { inputField.value = e.target.value; state.oldMeterModel = e.target.value; inputField.classList.add('valid'); selectField.classList.add('valid'); saveDraft(); validateForm(); });
         item.appendChild(inputDiv);
       }
