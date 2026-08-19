@@ -30,7 +30,7 @@
     /* ВАЛИДАЦИЯ - КРАСНАЯ И ЗЕЛЕНАЯ КРОМКА */
     input[type="text"], input[type="number"], input[type="tel"], textarea, select { flex-grow: 1; width: 100%; padding: 12px 14px; font-size: 0.95rem; border: 1px solid #ef4444; border-radius: 12px; background: #fff; font-family: inherit; -webkit-appearance: none; transition: border-color 0.3s; }
     input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 3px rgba(43,122,75,0.15); }
-    input.valid, select.valid { border-color: #22c55e !important; }
+    input.valid, select.valid, #signatureWrapper.valid { border-color: #22c55e !important; }
     input.neutral-border, select.neutral-border { border-color: #cbd5e1 !important; }
 
     select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 40px; }
@@ -68,6 +68,7 @@
     
     .add-photo-placeholder { width: 60px; height: 60px; border: 1px dashed #ef4444; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.65rem; color: #ef4444; font-weight: 500; background: #fff; cursor: pointer; flex-shrink: 0; transition: border-color 0.3s, color 0.3s; }
     .add-photo-placeholder.has-photos { border: 1px dashed #22c55e !important; color: #22c55e !important; }
+    .add-photo-placeholder.optional { border: 1px dashed #cbd5e1 !important; color: #64748b !important; }
 
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; overflow: hidden; }
     .modal-close { position: absolute; top: max(20px, env(safe-area-inset-top)); right: 20px; width: 40px; height: 40px; background: rgba(255,255,255,0.2); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; z-index: 1010; }
@@ -418,6 +419,7 @@
     { title: "👮 Пломба контролера старого", prefix: "05_old_seal_controller", hasInput: true }, 
     { title: "⬅️ Направление старого счетчика", prefix: "06_old_gas_direction" },
     { title: "📦 Общий вид нового счётчика", prefix: "07_new_meter_view" },
+    { title: "🗃️ Счетчик с коробом", prefix: "07_1_meter_with_box", conditionalMandatory: true },
     { title: "🆕 Серийный № нового", prefix: "08_new_meter_serial", hasSerialInput: true }, 
     { title: "📟 Показания нового", prefix: "09_new_meter_readings" },
     { title: "↗️ Направление нового счетчика", prefix: "10_new_gas_direction", hasDirectionInput: true }, 
@@ -699,8 +701,21 @@
         item.style.filter = 'grayscale(100%)';
       }
 
+      const isMandatory = !(cfg.conditionalMandatory && state.uirgLocation !== 'Улица');
+      
+      let metaHtml = '';
+      if (hasPhotos) {
+          metaHtml = `<div class="photo-meta">Файлов: ${photosArray.length}</div>`;
+      } else {
+          if (isMandatory) {
+              metaHtml = `<div class="photo-meta" style="color:#ef4444;">Нет файлов *</div>`;
+          } else {
+              metaHtml = `<div class="photo-meta" style="color:#64748b;">Необязательно</div>`;
+          }
+      }
+
       const headerDiv = document.createElement('div'); headerDiv.className = 'photo-header';
-      headerDiv.innerHTML = `<div><div class="photo-title">${cfg.title}</div>${hasPhotos ? `<div class="photo-meta">Файлов: ${photosArray.length}</div>` : `<div class="photo-meta" style="color:#ef4444;">Нет файлов *</div>`}</div>`;
+      headerDiv.innerHTML = `<div><div class="photo-title">${cfg.title}</div>${metaHtml}</div>`;
       item.appendChild(headerDiv);
 
       if (cfg.hasOldModelInput) {
@@ -819,7 +834,15 @@
 
       const mediaRow = document.createElement('div'); mediaRow.className = 'media-row';
       const placeholder = document.createElement('div'); 
-      placeholder.className = 'add-photo-placeholder' + (photosArray.length > 0 ? ' has-photos' : ''); 
+      
+      let btnClasses = 'add-photo-placeholder';
+      if (hasPhotos) {
+          btnClasses += ' has-photos';
+      } else if (!isMandatory) {
+          btnClasses += ' optional';
+      }
+      placeholder.className = btnClasses;
+      
       placeholder.innerHTML = `<span>➕</span>Добавить`; 
       placeholder.onclick = () => { state.currentActiveIndex = idx; globalFileInput.click(); }; 
       mediaRow.appendChild(placeholder);
@@ -861,6 +884,7 @@
   function validateForm() { 
     const allPhotosExist = state.photos.every((arr, i) => {
         if (state.noOldMeter && [3, 4, 5, 6].includes(i)) return true;
+        if (mandatoryConfig[i].conditionalMandatory && state.uirgLocation !== 'Улица') return true;
         return arr.length > 0;
     });
     const m1 = state.noOldMeter || state.oldMeterModel !== ''; 
