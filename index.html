@@ -784,17 +784,13 @@
 
       const item = document.createElement('div'); item.className = 'photo-item';
       
-      // Если стоит галочка "Нет старого счетчика", обесцвечиваем пункты 3, 4, 5, 6
-      if (state.noOldMeter && [3, 4, 5, 6].includes(idx)) {
+      if (state.noOldMeter && isOldMeterCfg) {
         item.style.opacity = '0.4';
         item.style.pointerEvents = 'none';
         item.style.filter = 'grayscale(100%)';
       }
 
       let totalPhotos = state.photos[idx].length;
-      if (isOldMeterCfg && state.oldMeterCount >= 2) totalPhotos += state.photos2[idx].length;
-      if (isOldMeterCfg && state.oldMeterCount >= 3) totalPhotos += state.photos3[idx].length;
-
       let metaHtml = '';
       if (totalPhotos > 0) {
           metaHtml = `<div class="photo-meta">Файлов: ${totalPhotos}</div>`;
@@ -824,211 +820,350 @@
         item.appendChild(noMeterDiv);
       }
 
-      const maxMeters = isOldMeterCfg ? state.oldMeterCount : 1;
-      
-      for (let m = 1; m <= maxMeters; m++) {
-          const wrapper = document.createElement('div');
-          wrapper.style.marginBottom = '8px';
-          
-          if (isOldMeterCfg) {
-              if (m > 1) {
-                  wrapper.style.marginTop = '12px';
-                  wrapper.style.borderTop = '1px dashed #cbd5e1';
-                  wrapper.style.paddingTop = '8px';
-              }
-              const mHeader = document.createElement('div');
-              mHeader.style = "font-size:0.85rem; color:#64748b; margin-bottom:8px; font-weight:600; display:flex; justify-content:space-between; align-items: center;";
-              mHeader.innerHTML = `<span>Счетчик №${m}</span>`;
-              if (m > 1 && idx === 2) { 
-                  const delBtn = document.createElement('span');
-                  delBtn.innerHTML = '❌ Удалить';
-                  delBtn.style = "color:#ef4444; cursor:pointer; font-size:0.8rem; font-weight: 500; background: #fee2e2; padding: 4px 8px; border-radius: 6px;";
-                  delBtn.onclick = () => { window.deleteOldMeter(m); };
-                  mHeader.appendChild(delBtn);
-              }
-              wrapper.appendChild(mHeader);
-          }
+      const disabledAttr = (state.noOldMeter && isOldMeterCfg) ? 'disabled' : '';
 
-          const disabledAttr = (state.noOldMeter && isOldMeterCfg) ? 'disabled' : '';
+      if (cfg.hasOldModelInput) {
+        if (state.oldMeterCount > 1) {
+            const m1Label = document.createElement('div');
+            m1Label.style = "font-size:0.85rem; color:#64748b; margin-bottom:8px; font-weight:600;";
+            m1Label.innerText = "Счетчик №1";
+            item.appendChild(m1Label);
+        }
 
-          if (cfg.hasOldModelInput) {
-            const inputDiv = document.createElement('div'); inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
-            if (state.noOldMeter && isOldMeterCfg) { inputDiv.style.opacity = '0.5'; inputDiv.style.pointerEvents = 'none'; }
-            
-            const knownOptions = [
-              "СГМН-1 G6", "BK-G6", "СГМН-МТ1 G6", "BK-G10", "BK-G16", "BK-G25", "BK-G40", "Novator G6 РЛ", "СГБ Смарт G6",
-              "СМТ-Смарт G4", "СМТ-Смарт G6", "СМТ-Смарт G10", "СМТ- Комплекс G16", "СМТ- Комплекс G25", "СМТ- Комплекс G40", "СМТ- Комплекс G65"
-            ];
-            
-            let currentModel = m===1 ? state.oldMeterModel : (m===2 ? state.oldMeterModel2 : state.oldMeterModel3);
-            const isKnownModel = knownOptions.includes(currentModel);
+        const inputDiv = document.createElement('div'); inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
+        
+        const knownOptions = [
+          "СГМН-1 G6", "BK-G6", "СГМН-МТ1 G6", "BK-G10", "BK-G16", "BK-G25", "BK-G40", "Novator G6 РЛ", "СГБ Смарт G6",
+          "СМТ-Смарт G4", "СМТ-Смарт G6", "СМТ-Смарт G10", "СМТ- Комплекс G16", "СМТ- Комплекс G25", "СМТ- Комплекс G40", "СМТ- Комплекс G65"
+        ];
+        
+        let currentModel = state.oldMeterModel;
+        const isKnownModel = knownOptions.includes(currentModel);
 
-            let optionsHtml = `<option value="" disabled ${!isKnownModel ? 'selected' : ''}>Выбрать...</option>`;
-            knownOptions.forEach(opt => { optionsHtml += `<option value="${opt}" ${currentModel === opt ? 'selected' : ''}>${opt}</option>`; });
+        let optionsHtml = `<option value="" disabled ${!isKnownModel ? 'selected' : ''}>Выбрать...</option>`;
+        knownOptions.forEach(opt => { optionsHtml += `<option value="${opt}" ${currentModel === opt ? 'selected' : ''}>${opt}</option>`; });
 
-            let inputClass = (state.noOldMeter) ? 'neutral-border' : (currentModel ? 'valid' : '');
+        let inputClass = (state.noOldMeter) ? 'neutral-border' : (currentModel ? 'valid' : '');
 
-            inputDiv.innerHTML = `<input type="text" placeholder="Модель" value="${currentModel}" class="${inputClass}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
-              <select class="${inputClass}" style="flex-shrink: 0; width: 140px; padding: 8px; border-radius: 10px; font-size: 0.85rem; background-color: #f8fafc;" ${disabledAttr}>
-                ${optionsHtml}
-              </select>`;
-            
-            const inputField = inputDiv.querySelector('input'); const selectField = inputDiv.querySelector('select');
-            
-            inputField.addEventListener('input', (e) => { 
-              let val = e.target.value.trim();
-              if(m===1) state.oldMeterModel=val; else if(m===2) state.oldMeterModel2=val; else state.oldMeterModel3=val;
-              inputField.classList.toggle('valid', val !== ''); 
-              if (knownOptions.includes(val)) { selectField.value = val; } else { selectField.value = ""; }
-              selectField.classList.toggle('valid', val !== ''); 
-              saveDraft(); validateForm(); 
-            });
-            selectField.addEventListener('change', (e) => { 
-              let val = e.target.value; inputField.value = val; 
-              if(m===1) state.oldMeterModel=val; else if(m===2) state.oldMeterModel2=val; else state.oldMeterModel3=val;
-              inputField.classList.add('valid'); selectField.classList.add('valid'); saveDraft(); validateForm(); 
-            });
-            wrapper.appendChild(inputDiv);
-          }
-
-          if (cfg.hasOldSerialAndReadings) {
-            let currentSerial = m===1 ? state.oldMeterSerial : (m===2 ? state.oldMeterSerial2 : state.oldMeterSerial3);
-            let currentReadings = m===1 ? state.oldMeterReadings : (m===2 ? state.oldMeterReadings2 : state.oldMeterReadings3);
-
-            let inputClassS = state.noOldMeter ? 'neutral-border' : (currentSerial ? 'valid' : '');
-            let inputClassR = state.noOldMeter ? 'neutral-border' : (currentReadings ? 'valid' : '');
-
-            const inputDiv = document.createElement('div');
-            if (state.noOldMeter && isOldMeterCfg) { inputDiv.style.opacity = '0.5'; inputDiv.style.pointerEvents = 'none'; }
-            inputDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Заводской №" value="${currentSerial}" class="${inputClassS}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
-              <input type="text" inputmode="decimal" placeholder="Показания" value="${currentReadings}" class="${inputClassR}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>`;
-            
-            const inputs = inputDiv.querySelectorAll('input');
-            inputs[0].addEventListener('input', (e) => { 
-              let val = e.target.value.trim();
-              if(m===1) state.oldMeterSerial=val; else if(m===2) state.oldMeterSerial2=val; else state.oldMeterSerial3=val;
-              e.target.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
-            });
-            inputs[1].addEventListener('input', (e) => { 
-              let val = e.target.value.trim();
-              if(m===1) state.oldMeterReadings=val; else if(m===2) state.oldMeterReadings2=val; else state.oldMeterReadings3=val;
-              e.target.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
-            });
-            wrapper.appendChild(inputDiv);
-          }
-
-          if (cfg.hasInput) { 
-            let currentSeal = m===1 ? state.controllerSeal : (m===2 ? state.controllerSeal2 : state.controllerSeal3);
-            let inputClass = state.noOldMeter ? 'neutral-border' : (currentSeal ? 'valid' : '');
-
-            const inputDiv = document.createElement('div'); 
-            inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
-            if (state.noOldMeter && isOldMeterCfg) { inputDiv.style.opacity = '0.5'; inputDiv.style.pointerEvents = 'none'; }
-            inputDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Введите номер пломбы" value="${currentSeal}" class="${inputClass}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
-              <label style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.9rem; flex-shrink: 0; background: #f1f5f9; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1; cursor:pointer;">
-                <input type="checkbox" style="width: 18px; height: 18px; margin: 0; accent-color: #2b7a4b;" ${disabledAttr}> Нет
-              </label>`;
-            
-            const inputField = inputDiv.querySelector('input[type="text"]'); const checkbox = inputDiv.querySelector('input[type="checkbox"]');
-            if (currentSeal === "Нет") { checkbox.checked = true; }
-            
-            inputField.addEventListener('input', (e) => { 
-              let val = e.target.value.trim();
-              if(m===1) state.controllerSeal=val; else if(m===2) state.controllerSeal2=val; else state.controllerSeal3=val;
-              if(val !== "Нет") checkbox.checked = false; 
-              inputField.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
-            });
-            checkbox.addEventListener('change', (e) => { 
-              let val = e.target.checked ? "Нет" : ""; inputField.value = val;
-              if(m===1) state.controllerSeal=val; else if(m===2) state.controllerSeal2=val; else state.controllerSeal3=val;
-              inputField.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
-            });
-            wrapper.appendChild(inputDiv);
-          }
-
-          if (m === 1) {
-              if (cfg.hasSerialInput) {
-                const inputDiv = document.createElement('div'); inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
-                inputDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Заводской №" value="${state.serialNumber || ''}" class="${state.serialNumber ? 'valid' : ''}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;">
-                  <button class="scan-btn" type="button" aria-label="Сканировать" style="flex-shrink: 0; width: 42px; height: 42px; border-radius: 10px; margin: 0; padding: 0;">📷</button>`;
-                const inputField = inputDiv.querySelector('input');
-                inputField.addEventListener('input', (e) => { state.serialNumber = e.target.value.trim(); e.target.classList.toggle('valid', state.serialNumber !== ''); saveDraft(); validateForm(); });
-                inputDiv.querySelector('.scan-btn').addEventListener('click', () => { 
-                  startWebScanner((resultText) => { 
-                    let parsedText = resultText.split(';')[0]; 
-                    inputField.value = parsedText; 
-                    state.serialNumber = parsedText; 
-                    inputField.classList.add('valid'); 
-                    saveDraft(); 
-                    validateForm(); 
-                  }); 
-                });
-                wrapper.appendChild(inputDiv);
-              }
-
-              if (cfg.hasDirectionInput) {
-                const inputDiv = document.createElement('div'); inputDiv.className = `radio-wrapper ${state.newGasDirection ? 'valid' : ''}`; inputDiv.style.marginBottom = '8px';
-                inputDiv.innerHTML = `<div class="radio-grid">
-                    <label class="radio-card"><input type="radio" name="newGasDir" value="сверху-вниз" ${state.newGasDirection==='сверху-вниз'?'checked':''}> ⬇️</label> <label class="radio-card"><input type="radio" name="newGasDir" value="снизу-вверх" ${state.newGasDirection==='снизу-вверх'?'checked':''}> ⬆️</label> <label class="radio-card"><input type="radio" name="newGasDir" value="справа-налево" ${state.newGasDirection==='справа-налево'?'checked':''}> ⬅️</label> <label class="radio-card"><input type="radio" name="newGasDir" value="слева-направо" ${state.newGasDirection==='слева-направо'?'checked':''}> ➡️</label>
-                  </div>`;
-                inputDiv.querySelectorAll('input[type="radio"]').forEach(radio => { radio.addEventListener('change', (e) => { state.newGasDirection = e.target.value; inputDiv.classList.add('valid'); saveDraft(); validateForm(); }); });
-                wrapper.appendChild(inputDiv);
-              }
-
-              if (cfg.hasSimInput) {
-                const inputDiv = document.createElement('div'); inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
-                inputDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Введите № SIM-карты" value="${state.simCardNumber || ''}" class="${state.simCardNumber ? 'valid' : ''}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;">
-                  <button class="scan-btn" type="button" aria-label="Сканировать" style="flex-shrink: 0; width: 42px; height: 42px; border-radius: 10px; margin: 0; padding: 0;">📷</button>`;
-                const inputField = inputDiv.querySelector('input');
-                inputField.addEventListener('input', (e) => { state.simCardNumber = e.target.value.trim(); e.target.classList.toggle('valid', state.simCardNumber !== ''); saveDraft(); validateForm(); });
-                inputDiv.querySelector('.scan-btn').addEventListener('click', () => { startWebScanner((resultText) => { inputField.value = resultText; state.simCardNumber = resultText; inputField.classList.add('valid'); saveDraft(); validateForm(); }); });
-                wrapper.appendChild(inputDiv);
-              }
-          }
-
-          const mediaRow = document.createElement('div'); mediaRow.className = 'media-row';
-          const pArray = m === 1 ? state.photos[idx] : (m === 2 ? state.photos2[idx] : state.photos3[idx]);
-          
-          let btnClasses = 'add-photo-placeholder';
-          if (pArray && pArray.length > 0) {
-              btnClasses += ' has-photos';
-          } else if (!isMandatory || (state.noOldMeter && isOldMeterCfg && idx !== 2)) {
-              btnClasses += ' optional';
-          }
-          
-          const placeholder = document.createElement('div'); 
-          placeholder.className = btnClasses;
-          placeholder.innerHTML = `<span>➕</span>Добавить`; 
-          if (state.noOldMeter && isOldMeterCfg && idx !== 2) {
-              placeholder.style.opacity = '0.5';
-              placeholder.style.pointerEvents = 'none';
-          } else {
-              placeholder.onclick = () => { state.currentActiveIndex = idx; state.currentActiveMeter = m; globalFileInput.click(); }; 
-          }
-          mediaRow.appendChild(placeholder);
-          
-          if (pArray) {
-              pArray.forEach((pData, pIdx) => {
-                const pContainer = document.createElement('div'); pContainer.className = 'photo-container';
-                const img = document.createElement('img'); img.src = pData.dataUrl; img.className = 'thumbnail'; img.onclick = (e) => { e.stopPropagation(); openLightbox(pData.dataUrl); };
-                const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '&times;'; delBtn.onclick = (e) => { e.stopPropagation(); removePhoto(idx, pIdx, m); };
-                pContainer.appendChild(img); pContainer.appendChild(delBtn); mediaRow.appendChild(pContainer);
-              });
-          }
-          wrapper.appendChild(mediaRow);
-          item.appendChild(wrapper);
+        inputDiv.innerHTML = `<input type="text" placeholder="Модель" value="${currentModel}" class="${inputClass}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
+          <select class="${inputClass}" style="flex-shrink: 0; width: 140px; padding: 8px; border-radius: 10px; font-size: 0.85rem; background-color: #f8fafc;" ${disabledAttr}>
+            ${optionsHtml}
+          </select>`;
+        
+        const inputField = inputDiv.querySelector('input'); const selectField = inputDiv.querySelector('select');
+        
+        inputField.addEventListener('input', (e) => { 
+          let val = e.target.value.trim(); state.oldMeterModel=val;
+          inputField.classList.toggle('valid', val !== ''); 
+          if (knownOptions.includes(val)) { selectField.value = val; } else { selectField.value = ""; }
+          selectField.classList.toggle('valid', val !== ''); 
+          saveDraft(); validateForm(); 
+        });
+        
+        selectField.addEventListener('change', (e) => { 
+            let val = e.target.value; inputField.value = val; state.oldMeterModel=val;
+            inputField.classList.add('valid'); selectField.classList.add('valid'); saveDraft(); validateForm(); 
+        });
+        item.appendChild(inputDiv);
       }
 
-      if (idx === 2 && state.oldMeterCount < 3 && !state.noOldMeter) {
+      if (cfg.hasOldSerialAndReadings) {
+        if (state.oldMeterCount > 1) {
+            const m1Label = document.createElement('div');
+            m1Label.style = "font-size:0.85rem; color:#64748b; margin-bottom:8px; font-weight:600;";
+            m1Label.innerText = "Счетчик №1";
+            item.appendChild(m1Label);
+        }
+        let inputClassS = state.noOldMeter ? 'neutral-border' : (state.oldMeterSerial ? 'valid' : '');
+        let inputClassR = state.noOldMeter ? 'neutral-border' : (state.oldMeterReadings ? 'valid' : '');
+
+        const inputDiv = document.createElement('div');
+        inputDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Заводской №" value="${state.oldMeterSerial}" class="${inputClassS}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
+          <input type="text" inputmode="decimal" placeholder="Показания" value="${state.oldMeterReadings}" class="${inputClassR}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>`;
+        
+        const inputs = inputDiv.querySelectorAll('input');
+        inputs[0].addEventListener('input', (e) => { 
+          state.oldMeterSerial=e.target.value.trim(); e.target.classList.toggle('valid', state.oldMeterSerial !== ''); saveDraft(); validateForm(); 
+        });
+        inputs[1].addEventListener('input', (e) => { 
+          state.oldMeterReadings=e.target.value.trim(); e.target.classList.toggle('valid', state.oldMeterReadings !== ''); saveDraft(); validateForm(); 
+        });
+        item.appendChild(inputDiv);
+      }
+
+      if (cfg.hasInput && isOldMeterCfg) { 
+        if (state.oldMeterCount > 1) {
+            const m1Label = document.createElement('div');
+            m1Label.style = "font-size:0.85rem; color:#64748b; margin-bottom:8px; font-weight:600;";
+            m1Label.innerText = "Счетчик №1";
+            item.appendChild(m1Label);
+        }
+        let inputClass = state.noOldMeter ? 'neutral-border' : (state.controllerSeal ? 'valid' : '');
+
+        const inputDiv = document.createElement('div'); 
+        inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
+        inputDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Введите номер пломбы" value="${state.controllerSeal}" class="${inputClass}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
+          <label style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.9rem; flex-shrink: 0; background: #f1f5f9; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1; cursor:pointer;">
+            <input type="checkbox" style="width: 18px; height: 18px; margin: 0; accent-color: #2b7a4b;" ${disabledAttr}> Нет
+          </label>`;
+        
+        const inputField = inputDiv.querySelector('input[type="text"]'); const checkbox = inputDiv.querySelector('input[type="checkbox"]');
+        if (state.controllerSeal === "Нет") { checkbox.checked = true; }
+        
+        inputField.addEventListener('input', (e) => { 
+          state.controllerSeal=e.target.value.trim();
+          if(state.controllerSeal !== "Нет") checkbox.checked = false; 
+          inputField.classList.toggle('valid', state.controllerSeal !== ''); saveDraft(); validateForm(); 
+        });
+        checkbox.addEventListener('change', (e) => { 
+          state.controllerSeal = e.target.checked ? "Нет" : ""; inputField.value = state.controllerSeal;
+          inputField.classList.toggle('valid', state.controllerSeal !== ''); saveDraft(); validateForm(); 
+        });
+        item.appendChild(inputDiv);
+      }
+
+      if (cfg.hasSerialInput && !isOldMeterCfg) {
+        const inputDiv = document.createElement('div'); inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
+        inputDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Заводской №" value="${state.serialNumber || ''}" class="${state.serialNumber ? 'valid' : ''}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;">
+          <button class="scan-btn" type="button" aria-label="Сканировать" style="flex-shrink: 0; width: 42px; height: 42px; border-radius: 10px; margin: 0; padding: 0;">📷</button>`;
+        const inputField = inputDiv.querySelector('input');
+        inputField.addEventListener('input', (e) => { state.serialNumber = e.target.value.trim(); e.target.classList.toggle('valid', state.serialNumber !== ''); saveDraft(); validateForm(); });
+        inputDiv.querySelector('.scan-btn').addEventListener('click', () => { 
+          startWebScanner((resultText) => { 
+            let parsedText = resultText.split(';')[0]; 
+            inputField.value = parsedText; 
+            state.serialNumber = parsedText; 
+            inputField.classList.add('valid'); 
+            saveDraft(); 
+            validateForm(); 
+          }); 
+        });
+        item.appendChild(inputDiv);
+      }
+
+      if (cfg.hasDirectionInput && !isOldMeterCfg) {
+        const inputDiv = document.createElement('div'); inputDiv.className = `radio-wrapper ${state.newGasDirection ? 'valid' : ''}`; inputDiv.style.marginBottom = '8px';
+        inputDiv.innerHTML = `<div class="radio-grid">
+            <label class="radio-card"><input type="radio" name="newGasDir" value="сверху-вниз" ${state.newGasDirection==='сверху-вниз'?'checked':''}> ⬇️</label> <label class="radio-card"><input type="radio" name="newGasDir" value="снизу-вверх" ${state.newGasDirection==='снизу-вверх'?'checked':''}> ⬆️</label> <label class="radio-card"><input type="radio" name="newGasDir" value="справа-налево" ${state.newGasDirection==='справа-налево'?'checked':''}> ⬅️</label> <label class="radio-card"><input type="radio" name="newGasDir" value="слева-направо" ${state.newGasDirection==='слева-направо'?'checked':''}> ➡️</label>
+          </div>`;
+        inputDiv.querySelectorAll('input[type="radio"]').forEach(radio => { radio.addEventListener('change', (e) => { state.newGasDirection = e.target.value; inputDiv.classList.add('valid'); saveDraft(); validateForm(); }); });
+        item.appendChild(inputDiv);
+      }
+
+      if (cfg.hasSimInput) {
+        const inputDiv = document.createElement('div'); inputDiv.style.display = 'flex'; inputDiv.style.gap = '8px'; inputDiv.style.marginBottom = '8px';
+        inputDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Введите № SIM-карты" value="${state.simCardNumber || ''}" class="${state.simCardNumber ? 'valid' : ''}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;">
+          <button class="scan-btn" type="button" aria-label="Сканировать" style="flex-shrink: 0; width: 42px; height: 42px; border-radius: 10px; margin: 0; padding: 0;">📷</button>`;
+        const inputField = inputDiv.querySelector('input');
+        inputField.addEventListener('input', (e) => { state.simCardNumber = e.target.value.trim(); e.target.classList.toggle('valid', state.simCardNumber !== ''); saveDraft(); validateForm(); });
+        inputDiv.querySelector('.scan-btn').addEventListener('click', () => { startWebScanner((resultText) => { inputField.value = resultText; state.simCardNumber = resultText; inputField.classList.add('valid'); saveDraft(); validateForm(); }); });
+        item.appendChild(inputDiv);
+      }
+
+      const mediaRow = document.createElement('div'); mediaRow.className = 'media-row';
+      const pArray = state.photos[idx];
+      
+      let btnClasses = 'add-photo-placeholder';
+      if (pArray && pArray.length > 0) {
+          btnClasses += ' has-photos';
+      } else if (!isMandatory || (state.noOldMeter && isOldMeterCfg && idx !== 2)) {
+          btnClasses += ' optional';
+      }
+      
+      const placeholder = document.createElement('div'); 
+      placeholder.className = btnClasses;
+      placeholder.innerHTML = `<span>➕</span>Добавить`; 
+      if (state.noOldMeter && isOldMeterCfg && idx !== 2) {
+          placeholder.style.opacity = '0.5';
+          placeholder.style.pointerEvents = 'none';
+      } else {
+          placeholder.onclick = () => { state.currentActiveIndex = idx; state.currentActiveMeter = 1; globalFileInput.click(); }; 
+      }
+      mediaRow.appendChild(placeholder);
+      
+      if (pArray) {
+          pArray.forEach((pData, pIdx) => {
+            const pContainer = document.createElement('div'); pContainer.className = 'photo-container';
+            const img = document.createElement('img'); img.src = pData.dataUrl; img.className = 'thumbnail'; img.onclick = (e) => { e.stopPropagation(); openLightbox(pData.dataUrl); };
+            const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '&times;'; delBtn.onclick = (e) => { e.stopPropagation(); removePhoto(idx, pIdx, 1); };
+            pContainer.appendChild(img); pContainer.appendChild(delBtn); mediaRow.appendChild(pContainer);
+          });
+      }
+      item.appendChild(mediaRow); mandatoryListDiv.appendChild(item);
+
+      // ГЕНЕРАЦИЯ КАРТОЧЕК ДЛЯ 2 И 3 СЧЕТЧИКА (Вставляются после последнего старого счетчика)
+      if (idx === 6 && state.oldMeterCount > 1) {
+          for (let m = 2; m <= state.oldMeterCount; m++) {
+              const mCard = document.createElement('div');
+              mCard.className = 'photo-item';
+              mCard.style.border = '2px solid #cbd5e1';
+              mCard.style.marginTop = '16px';
+              
+              if (state.noOldMeter) {
+                  mCard.style.opacity = '0.4';
+                  mCard.style.pointerEvents = 'none';
+                  mCard.style.filter = 'grayscale(100%)';
+              }
+
+              const mHeader = document.createElement('div');
+              mHeader.style = "display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;";
+              mHeader.innerHTML = `<div style="font-weight:700; font-size:1rem; color:#1e293b;">Счетчик №${m}</div>`;
+              
+              const delBtn = document.createElement('span');
+              delBtn.innerHTML = '❌ Удалить';
+              delBtn.style = "color: #ef4444; font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 4px 8px; background: #fee2e2; border-radius: 8px;";
+              delBtn.onclick = () => window.deleteOldMeter(m);
+              mHeader.appendChild(delBtn);
+              mCard.appendChild(mHeader);
+
+              const knownOptions = [
+                "СГМН-1 G6", "BK-G6", "СГМН-МТ1 G6", "BK-G10", "BK-G16", "BK-G25", "BK-G40", "Novator G6 РЛ", "СГБ Смарт G6",
+                "СМТ-Смарт G4", "СМТ-Смарт G6", "СМТ-Смарт G10", "СМТ- Комплекс G16", "СМТ- Комплекс G25", "СМТ- Комплекс G40", "СМТ- Комплекс G65"
+              ];
+
+              // Модель
+              let currentModel = m===2 ? state.oldMeterModel2 : state.oldMeterModel3;
+              let isKnownModel = knownOptions.includes(currentModel);
+              let optionsHtml = `<option value="" disabled ${!isKnownModel ? 'selected' : ''}>Выбрать...</option>`;
+              knownOptions.forEach(opt => { optionsHtml += `<option value="${opt}" ${currentModel === opt ? 'selected' : ''}>${opt}</option>`; });
+              let inputClassM = state.noOldMeter ? 'neutral-border' : (currentModel ? 'valid' : '');
+
+              const modelDiv = document.createElement('div');
+              modelDiv.style.display = 'flex'; modelDiv.style.gap = '8px'; modelDiv.style.marginBottom = '8px';
+              modelDiv.innerHTML = `<input type="text" placeholder="Модель" value="${currentModel}" class="${inputClassM}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
+                <select class="${inputClassM}" style="flex-shrink: 0; width: 140px; padding: 8px; border-radius: 10px; font-size: 0.85rem; background-color: #f8fafc;" ${disabledAttr}>
+                  ${optionsHtml}
+                </select>`;
+              const inM = modelDiv.querySelector('input'); const selM = modelDiv.querySelector('select');
+              inM.addEventListener('input', (e) => { 
+                let val = e.target.value.trim(); if(m===2) state.oldMeterModel2=val; else state.oldMeterModel3=val;
+                inM.classList.toggle('valid', val !== ''); if (knownOptions.includes(val)) { selM.value = val; } else { selM.value = ""; }
+                selM.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
+              });
+              selM.addEventListener('change', (e) => { 
+                let val = e.target.value; inM.value = val; if(m===2) state.oldMeterModel2=val; else state.oldMeterModel3=val;
+                inM.classList.add('valid'); selM.classList.add('valid'); saveDraft(); validateForm(); 
+              });
+              mCard.appendChild(modelDiv);
+
+              // Серийник и показания
+              let currentSerial = m===2 ? state.oldMeterSerial2 : state.oldMeterSerial3;
+              let currentReadings = m===2 ? state.oldMeterReadings2 : state.oldMeterReadings3;
+              let inputClassS = state.noOldMeter ? 'neutral-border' : (currentSerial ? 'valid' : '');
+              let inputClassR = state.noOldMeter ? 'neutral-border' : (currentReadings ? 'valid' : '');
+
+              const srDiv = document.createElement('div');
+              srDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Заводской №" value="${currentSerial}" class="${inputClassS}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
+                <input type="text" inputmode="decimal" placeholder="Показания" value="${currentReadings}" class="${inputClassR}" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>`;
+              const inS = srDiv.querySelectorAll('input')[0]; const inR = srDiv.querySelectorAll('input')[1];
+              inS.addEventListener('input', (e) => { 
+                let val = e.target.value.trim(); if(m===2) state.oldMeterSerial2=val; else state.oldMeterSerial3=val;
+                inS.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
+              });
+              inR.addEventListener('input', (e) => { 
+                let val = e.target.value.trim(); if(m===2) state.oldMeterReadings2=val; else state.oldMeterReadings3=val;
+                inR.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
+              });
+              mCard.appendChild(srDiv);
+
+              // Пломба
+              let currentSeal = m===2 ? state.controllerSeal2 : state.controllerSeal3;
+              let inputClassSeal = state.noOldMeter ? 'neutral-border' : (currentSeal ? 'valid' : '');
+
+              const sealDiv = document.createElement('div');
+              sealDiv.style.display = 'flex'; sealDiv.style.gap = '8px'; sealDiv.style.marginBottom = '8px';
+              sealDiv.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Введите номер пломбы" value="${currentSeal}" class="${inputClassSeal}" style="flex-grow: 1; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem;" ${disabledAttr}>
+                <label style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.9rem; flex-shrink: 0; background: #f1f5f9; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1; cursor:pointer;">
+                  <input type="checkbox" style="width: 18px; height: 18px; margin: 0; accent-color: #2b7a4b;" ${disabledAttr}> Нет
+                </label>`;
+              const inSeal = sealDiv.querySelector('input[type="text"]'); const chkSeal = sealDiv.querySelector('input[type="checkbox"]');
+              if (currentSeal === "Нет") chkSeal.checked = true;
+              
+              inSeal.addEventListener('input', (e) => { 
+                let val = e.target.value.trim(); if(m===2) state.controllerSeal2=val; else state.controllerSeal3=val;
+                if(val !== "Нет") chkSeal.checked = false; 
+                inSeal.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
+              });
+              chkSeal.addEventListener('change', (e) => { 
+                let val = e.target.checked ? "Нет" : ""; inSeal.value = val;
+                if(m===2) state.controllerSeal2=val; else state.controllerSeal3=val;
+                inSeal.classList.toggle('valid', val !== ''); saveDraft(); validateForm(); 
+              });
+              mCard.appendChild(sealDiv);
+
+              // Блок с фотографиями для счетчика
+              const photosContainer = document.createElement('div');
+              photosContainer.style.marginTop = '16px';
+              photosContainer.style.display = 'flex';
+              photosContainer.style.flexDirection = 'column';
+              photosContainer.style.gap = '12px';
+
+              [2, 3, 4, 5, 6].forEach(cfgIdx => {
+                  const subCfg = mandatoryConfig[cfgIdx];
+                  const subPArray = m === 2 ? state.photos2[cfgIdx] : state.photos3[cfgIdx];
+                  
+                  const pRow = document.createElement('div');
+                  
+                  let subMetaHtml = '';
+                  if (subPArray && subPArray.length > 0) {
+                      subMetaHtml = `<div class="photo-meta">Файлов: ${subPArray.length}</div>`;
+                  } else {
+                      subMetaHtml = `<div class="photo-meta" style="color:#ef4444;">Нет файлов *</div>`;
+                  }
+
+                  const pHeader = document.createElement('div');
+                  pHeader.className = 'photo-header';
+                  pHeader.style.marginBottom = '8px';
+                  pHeader.innerHTML = `<div><div class="photo-title">${subCfg.title}</div>${subMetaHtml}</div>`;
+                  pRow.appendChild(pHeader);
+
+                  const subMediaRow = document.createElement('div');
+                  subMediaRow.className = 'media-row';
+                  
+                  let subBtnClasses = 'add-photo-placeholder';
+                  if (subPArray && subPArray.length > 0) subBtnClasses += ' has-photos';
+                  else if (state.noOldMeter && cfgIdx !== 2) subBtnClasses += ' optional';
+                  
+                  const subPlaceholder = document.createElement('div'); 
+                  subPlaceholder.className = subBtnClasses;
+                  subPlaceholder.innerHTML = `<span>➕</span>Добавить`; 
+                  
+                  if (state.noOldMeter && cfgIdx !== 2) {
+                      subPlaceholder.style.opacity = '0.5';
+                      subPlaceholder.style.pointerEvents = 'none';
+                  } else {
+                      subPlaceholder.onclick = () => { state.currentActiveIndex = cfgIdx; state.currentActiveMeter = m; globalFileInput.click(); }; 
+                  }
+                  subMediaRow.appendChild(subPlaceholder);
+                  
+                  if (subPArray) {
+                      subPArray.forEach((pData, pIdx) => {
+                          const pContainer = document.createElement('div'); pContainer.className = 'photo-container';
+                          const img = document.createElement('img'); img.src = pData.dataUrl; img.className = 'thumbnail'; img.onclick = (e) => { e.stopPropagation(); openLightbox(pData.dataUrl); };
+                          const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '&times;'; delBtn.onclick = (e) => { e.stopPropagation(); removePhoto(cfgIdx, pIdx, m); };
+                          pContainer.appendChild(img); pContainer.appendChild(delBtn); subMediaRow.appendChild(pContainer);
+                      });
+                  }
+                  pRow.appendChild(subMediaRow);
+                  photosContainer.appendChild(pRow);
+              });
+
+              mCard.appendChild(photosContainer);
+              mandatoryListDiv.appendChild(mCard);
+          }
+      }
+
+      // КНОПКА ДОБАВЛЕНИЯ СЧЕТЧИКА (Плавает внизу после последнего старого счетчика)
+      if (idx === 6 && state.oldMeterCount < 3 && !state.noOldMeter) {
           const addBtn = document.createElement('button');
           addBtn.className = 'secondary';
-          addBtn.style = 'padding: 10px; font-size: 0.9rem; margin-top: 8px; width: 100%; background: #f1f5f9; border: 1px dashed #94a3b8; color: #475569; display: flex; justify-content: center; align-items: center; gap: 6px;';
+          addBtn.style.marginTop = '16px';
+          addBtn.style.marginBottom = '8px';
           addBtn.innerHTML = '➕ Добавить счетчик';
           addBtn.onclick = () => { state.oldMeterCount++; saveDraft(); renderChecklist(); validateForm(); };
-          item.appendChild(addBtn);
+          mandatoryListDiv.appendChild(addBtn);
       }
 
-      mandatoryListDiv.appendChild(item);
     });
     validateForm();
   }
