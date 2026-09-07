@@ -1,4 +1,4 @@
-const CACHE_NAME = 'etalon-pwa-v2.5';
+const CACHE_NAME = 'etalon-pwa-v2.6';
 const ASSETS = [
   'index.html',
   'manifest.json',
