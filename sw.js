@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stm-naselenie-v2.0';
+const CACHE_NAME = 'etalon-pwa-v1.7';
 const ASSETS = [
   'index.html',
   'manifest.json',
@@ -9,7 +9,6 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
-  self.skipWaiting(); // Принудительно активировать новый SW сразу после установки
 });
 
 self.addEventListener('activate', (e) => {
@@ -24,7 +23,6 @@ self.addEventListener('activate', (e) => {
       );
     })
   );
-  return self.clients.claim(); // Захватить контроль над всеми открытыми вкладками
 });
 
 self.addEventListener('fetch', (e) => {
