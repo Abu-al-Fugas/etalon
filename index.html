@@ -315,7 +315,7 @@
     </div>
   </div>
 
-  <footer>iPhone | Версия 8.8.8 (go)</footer>
+  <footer>iPhone | Версия 8.8.8 (Apple)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -357,7 +357,20 @@
 
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(() => console.log('PWA Offline Ready'));
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      console.log('PWA Offline Ready');
+      // Принудительно проверяем наличие обновления при запуске
+      reg.update();
+    });
+
+    // Автоматическая перезагрузка страницы при обновлении кеша Service Worker
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
   }
 
   // ---- Firebase config ----
