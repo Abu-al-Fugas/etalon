@@ -1,4 +1,4 @@
-const CACHE_NAME = 'etalon-pwa-v2.1';
+const CACHE_NAME = 'etalon-pwa-v2.2';
 const ASSETS = [
   'index.html',
   'manifest.json',
@@ -9,7 +9,7 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
-  self.skipWaiting(); // Активировать сразу после установки
+  self.skipWaiting(); // Активировать сразу, не дожидаясь закрытия приложения
 });
 
 self.addEventListener('activate', (e) => {
@@ -18,16 +18,32 @@ self.addEventListener('activate', (e) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            return caches.delete(key);
+            return caches.delete(key); // Удалить старый кеш
           }
         })
       );
     })
   );
-  return self.clients.claim(); // Захватить контроль над всеми вкладками
+  return self.clients.claim(); // Взять под контроль все открытые страницы
 });
 
 self.addEventListener('fetch', (e) => {
+  // Для HTML-страниц (index.html): сначала идем в сеть, если сети нет — отдаем кеш
+  if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+    e.respondWith(
+      fetch(e.request)
+        .then((networkResponse) => {
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, networkResponse.clone());
+            return networkResponse;
+          });
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Для иконок, стилей и манифеста: отдаем из кеша, при отсутствии берем из сети
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
       return cachedResponse || fetch(e.request);
