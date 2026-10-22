@@ -51,6 +51,7 @@
     button.secondary { background: #e2e8f0; color: #334155; }
     button.share-btn { background: #2563eb; margin-top: 4px; }
     button.share-btn:active { background: #1d4ed8; }
+    button.share-btn:disabled { background: #cbd5e1 !important; color: #94a3b8 !important; box-shadow: none; cursor: not-allowed; transform: none; }
     button.danger-btn { background: #ef4444; color: white; }
     button.danger-btn:active { background: #dc2626; }
 
@@ -95,6 +96,7 @@
     .geo-searching { background: #fef3c7; color: #d97706; }
     .geo-success { background: #dcfce7; color: #15803d; }
     .geo-error { background: #fee2e2; color: #b91c1c; }
+    .geo-ready { background: #ffedd5; color: #c2410c; }
     
     .archive-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; transition: padding-bottom 0.3s; }
     .archive-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; transition: background 0.2s; position: relative; }
@@ -135,6 +137,10 @@
     button.form-select-btn { width: 100%; padding: 12px 14px; font-size: 0.95rem; font-weight: 400; border: 1px solid #ef4444; border-radius: 12px; background-color: #fff; color: #1e293b; box-shadow: none; display: flex; justify-content: space-between; align-items: center; text-align: left; transition: border-color 0.3s; }
     button.form-select-btn.placeholder span:first-child { color: #64748b; }
     button.form-select-btn:active { background-color: #f8fafc; transform: none; }
+    
+    button#cityName { white-space: normal; line-height: 1.25; text-align: left; }
+    button#cityName span#cityNameLabel { display: block; flex-grow: 1; }
+
     .no-account-label { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.9rem; flex-shrink: 0; background: #f1f5f9; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1; cursor:pointer; transition: opacity 0.2s; }
     .no-account-label input { width: 18px; height: 18px; margin: 0; accent-color: #2b7a4b; }
     .scan-mini-btn { flex-shrink: 0; width: 42px; height: 42px; border-radius: 10px; margin: 0; padding: 0; }
@@ -291,7 +297,7 @@
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; margin-top: 8px; border-top: 1px solid #e2e8f0;">
         <span style="font-size: 0.85rem; color: #64748b;">Статус отчёта:</span>
-        <span id="reportStatusBadge" class="geo-status-badge geo-searching">⚠️ Не отправлен</span>
+        <span id="reportStatusBadge" class="geo-status-badge geo-error">❌ Не отправлен</span>
       </div>
     </div>
   </div>
@@ -344,7 +350,7 @@
     </div>
   </div>
 
-  <footer>Android | Версия 1.0.2 (OTA)</footer>
+  <footer>Android | Версия 1.0.4 (OTA)</footer>
 </div>
 
 <div id="photoModal" class="modal">
@@ -659,6 +665,7 @@
     archiveFresh: false,
     reportId: '',
     sentToFirebase: false,
+    reportShared: false,
     inventoryOperations: [],
     currentInventoryOpType: null,
     cityName: '', objectName: '', address: '', uirgLocation: '', installerName: '', serialNumber: '', meterModel: '', 
@@ -699,7 +706,14 @@
     const lbl = document.getElementById(labelId);
     if (!btn || !lbl) return;
     const hasVal = Boolean(value && String(value).trim() !== '');
-    lbl.innerText = hasVal ? value : (placeholderText || 'Выберите...');
+    
+    if (btnId === 'cityName' && hasVal && String(value).includes(' / ')) {
+      const parts = String(value).split(' / ');
+      lbl.innerHTML = `<span style="display:block; font-weight:600; font-size:0.95rem;">${escapeHtml(parts[0])}</span><span style="display:block; font-size:0.8rem; color:#64748b; line-height:1.2;">${escapeHtml(parts[1])}</span>`;
+    } else {
+      lbl.innerText = hasVal ? value : (placeholderText || 'Выберите...');
+    }
+    
     btn.classList.toggle('placeholder', !hasVal);
   }
 
@@ -743,12 +757,16 @@
   function updateReportStatusBadge() {
     const badge = document.getElementById('reportStatusBadge');
     if (!badge) return;
-    if (state.sentToFirebase) {
+    
+    if (state.reportShared) {
       badge.className = 'geo-status-badge geo-success';
       badge.innerText = '✅ Отправлен';
+    } else if (state.sentToFirebase) {
+      badge.className = 'geo-status-badge geo-ready';
+      badge.innerText = '✅ Отчёт готов';
     } else {
-      badge.className = 'geo-status-badge geo-searching';
-      badge.innerText = '⚠️ Не отправлен';
+      badge.className = 'geo-status-badge geo-error';
+      badge.innerText = '❌ Не отправлен';
     }
   }
 
@@ -1067,20 +1085,30 @@
 
   function saveDraft(isLifecycleEvent) {
     if (!isLifecycleEvent) {
+      let statusChanged = false;
+      // Сбрасываем флаги ТОЛЬКО при реальном изменении формы после создания архива
       if (state.archiveFresh) {
         state.archiveFresh = false;
-        refreshActionButtons();
-        validateForm();
+        state.reportShared = false;
+        statusChanged = true;
       }
       if (state.sentToFirebase && state.creationDate) {
         state.sentToFirebase = false;
+        statusChanged = true;
+      }
+      
+      if (statusChanged) {
+        refreshActionButtons();
+        validateForm();
         updateReportStatusBadge();
       }
     }
+    
     if (!db) return;
     const draftState = {
       reportId: state.reportId,
       sentToFirebase: state.sentToFirebase,
+      reportShared: state.reportShared,
       cityName: state.cityName, objectName: state.objectName, address: state.address, uirgLocation: state.uirgLocation, installerName: state.installerName, serialNumber: state.serialNumber, meterModel: state.meterModel,
       consumerRole: state.consumerRole, consumerName: state.consumerName, accountNumber: state.accountNumber, signatureDataUrl: state.signatureDataUrl,
       powerKw: state.powerKw, powerM3: state.powerM3, powerPg: state.powerPg, totalPower: state.totalPower, suggestedMeter: state.suggestedMeter, controllerSeal: state.controllerSeal,
@@ -1115,6 +1143,7 @@
         
         state.reportId = d.reportId || '';
         state.sentToFirebase = d.sentToFirebase || false;
+        state.reportShared = d.reportShared || false;
         state.archiveFresh = false;
         refreshActionButtons();
         updateReportStatusBadge();
@@ -1559,13 +1588,20 @@
 
       filtered.forEach(m => {
           const div = document.createElement('div');
-          div.innerText = m;
           div.style.padding = '12px 16px';
           div.style.background = '#f8fafc';
           div.style.borderRadius = '10px';
           div.style.border = '1px solid #cbd5e1';
           div.style.cursor = 'pointer';
-          div.style.fontSize = '0.95rem';
+          
+          if (currentModalSource === 'city' && String(m).includes(' / ')) {
+              const parts = String(m).split(' / ');
+              div.innerHTML = `<div style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(parts[0])}</div><div style="font-size: 0.8rem; color: #64748b; margin-top:2px;">${escapeHtml(parts[1])}</div>`;
+          } else {
+              div.style.fontSize = '0.95rem';
+              div.innerText = m;
+          }
+          
           div.onclick = () => {
               if (onModelSelectCallback) onModelSelectCallback(m);
               modelSearchModal.style.display = 'none';
@@ -2377,10 +2413,18 @@
       const finalZipUint8 = new Uint8Array(offset + cdLen + 22); let currentPos = 0; fileData.forEach(part => { finalZipUint8.set(part, currentPos); currentPos += part.length; }); centralDir.forEach(part => { finalZipUint8.set(part, currentPos); currentPos += part.length; }); finalZipUint8.set(eocd, currentPos);
       
       const d = new Date(state.creationDate);
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      const timeStr = `${String(d.getHours()).padStart(2,'0')}-${String(d.getMinutes()).padStart(2,'0')}-${String(d.getSeconds()).padStart(2,'0')}`;
+      const dateStr = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
       let sanitizedSerial = state.serialNumber.replace(/[^a-zа-яё0-9]/gi, '_').substring(0, 24);
-      currentZipName = `${sanitizedSerial}_${dateStr}_${timeStr}.zip`;
+      let baseName = `${sanitizedSerial}_${dateStr}`;
+      
+      let finalName = baseName + ".zip";
+      let counter = 2;
+      let existingNames = savedArchives.map(a => a.name);
+      while (existingNames.includes(finalName)) {
+          finalName = `${baseName}_${counter}.zip`;
+          counter++;
+      }
+      currentZipName = finalName;
       currentZipBlob = new Blob([finalZipUint8], { type: "application/zip" });
 
       const fbReportData = { 
@@ -2467,6 +2511,15 @@
               fileWriter.onwriteend = function () {
                 nativeFileUrl = fileEntry.nativeURL;
                 safeSetLocal('meta_' + currentZipName, emailBodyText);
+                
+                // Добавляем в локальный список для предотвращения коллизий
+                savedArchives.unshift({
+                  name: currentZipName,
+                  nativeURL: fileEntry.nativeURL,
+                  entry: fileEntry,
+                  date: parseArchiveDateFromName(currentZipName)
+                });
+                
                 clearDraft();
                 state.archiveFresh = true;
                 savedFileNameSpan.innerText = currentZipName;
@@ -2488,6 +2541,15 @@
         if (db) {
           const tx = db.transaction("archives", "readwrite");
           tx.oncomplete = function() {
+            // Добавляем в локальный список для предотвращения коллизий
+            savedArchives.unshift({
+              name: currentZipName,
+              nativeURL: currentZipName,
+              base64: base64Data,
+              text: emailBodyText,
+              date: new Date().toISOString()
+            });
+
             clearDraft();
             state.archiveFresh = true;
             savedFileNameSpan.innerText = currentZipName;
@@ -2527,7 +2589,11 @@
   shareTextBtn.addEventListener('click', () => {
     const fileTarget = nativeFileUrl || currentZipName;
     if (fileTarget) {
-      shareFiles([fileTarget], `Счетчик № ${state.serialNumber}`);
+      shareFiles([fileTarget], `Счетчик № ${state.serialNumber}`, null, () => {
+        state.reportShared = true;
+        saveDraft(true); // сохраняем флаг в IndexedDB без сброса
+        updateReportStatusBadge();
+      });
     } else {
       showToast("Файл не найден.");
     }
@@ -2574,7 +2640,7 @@
     state.gasPhotos.length = 0;
 
     if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } if (gpsTimeoutId !== null) { clearTimeout(gpsTimeoutId); gpsTimeoutId = null; }
-    state = { archiveFresh: false, reportId: '', sentToFirebase: false, inventoryOperations: [], currentInventoryOpType: null, cityName: '', objectName: '', address: '', uirgLocation: '', installerName: safeGetLocal('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', signatureDataUrl: '', powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: '', controllerSeal: '', oldMeterCount: 1, oldMeterModel: '', oldMeterSerial: '', oldMeterReadings: '', oldMeterModel2: '', oldMeterSerial2: '', oldMeterReadings2: '', controllerSeal2: '', oldMeterModel3: '', oldMeterSerial3: '', oldMeterReadings3: '', controllerSeal3: '', newGasDirection: '', simCardNumber: '', noOldMeter: false, comment: '', coordinates: null, creationDate: null, gpsLocked: false, photos: Array.from({ length: mandatoryConfig.length }, () => []), photos2: Array.from({ length: mandatoryConfig.length }, () => []), photos3: Array.from({ length: mandatoryConfig.length }, () => []), gasPhotos: [], currentActiveIndex: null, currentActiveMeter: 1 };
+    state = { archiveFresh: false, reportId: '', sentToFirebase: false, reportShared: false, inventoryOperations: [], currentInventoryOpType: null, cityName: '', objectName: '', address: '', uirgLocation: '', installerName: safeGetLocal('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', signatureDataUrl: '', powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: '', controllerSeal: '', oldMeterCount: 1, oldMeterModel: '', oldMeterSerial: '', oldMeterReadings: '', oldMeterModel2: '', oldMeterSerial2: '', oldMeterReadings2: '', controllerSeal2: '', oldMeterModel3: '', oldMeterSerial3: '', oldMeterReadings3: '', controllerSeal3: '', newGasDirection: '', simCardNumber: '', noOldMeter: false, comment: '', coordinates: null, creationDate: null, gpsLocked: false, photos: Array.from({ length: mandatoryConfig.length }, () => []), photos2: Array.from({ length: mandatoryConfig.length }, () => []), photos3: Array.from({ length: mandatoryConfig.length }, () => []), gasPhotos: [], currentActiveIndex: null, currentActiveMeter: 1 };
     currentZipName = "";
     currentZipBlob = null;
     nativeFileUrl = "";
@@ -3046,9 +3112,11 @@
   let savedArchives = []; let selectedArchives = new Set(); let isMultiSelectMode = false;
 
   function parseArchiveDateFromName(name) {
-    const m = String(name).match(
-      /(\d{4}-\d{2}-\d{2})(?:_(\d{2})-(\d{2})-(\d{2}))?\.zip$/i
-    );
+    let m = String(name).match(/(\d{2})\.(\d{2})\.(\d{4})(?:_\d+)?\.zip$/i);
+    if (m) {
+      return new Date(`${m[3]}-${m[2]}-${m[1]}T12:00:00`).toISOString();
+    }
+    m = String(name).match(/(\d{4}-\d{2}-\d{2})(?:_(\d{2})-(\d{2})-(\d{2}))?\.zip$/i);
     if (m) {
       const time = m[2] ? `T${m[2]}:${m[3]}:${m[4]}` : 'T12:00:00';
       return new Date(m[1] + time).toISOString();
@@ -3062,18 +3130,23 @@
     if (typeof cordova !== 'undefined' && cordova.file) {
       window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function(dirEntry) {
         const reader = dirEntry.createReader();
-        reader.readEntries(function(entries) {
-          const zipEntries = (entries || [])
-            .filter(e => e.isFile && e.name.endsWith('.zip'));
-          zipEntries.sort((a, b) =>
-            new Date(parseArchiveDateFromName(b.name)) -
-            new Date(parseArchiveDateFromName(a.name))
-          );
-          savedArchives = zipEntries.map(entry => ({
-            name: entry.name,
-            nativeURL: entry.nativeURL,
-            entry: entry,
-            date: parseArchiveDateFromName(entry.name)
+        reader.readEntries(async function(entries) {
+          const zipEntries = (entries || []).filter(e => e.isFile && e.name.endsWith('.zip'));
+          
+          const entriesWithMeta = await Promise.all(zipEntries.map(entry => {
+            return new Promise(resolve => {
+              entry.file(f => resolve({ entry: entry, time: f.lastModified || f.modificationTime || 0 }), 
+                         () => resolve({ entry: entry, time: 0 }));
+            });
+          }));
+          
+          entriesWithMeta.sort((a, b) => b.time - a.time);
+          
+          savedArchives = entriesWithMeta.map(item => ({
+            name: item.entry.name,
+            nativeURL: item.entry.nativeURL,
+            entry: item.entry,
+            date: parseArchiveDateFromName(item.entry.name)
           }));
           renderArchiveList();
         }, function(err) {
@@ -3086,10 +3159,7 @@
       if (!db) { archiveListContainer.innerHTML = '<div style="text-align:center; padding: 20px;">Ошибка БД</div>'; return; }
       db.transaction("archives", "readonly").objectStore("archives").getAll().onsuccess = (e) => {
         const raw = e.target.result || [];
-        raw.sort((a, b) =>
-          new Date(b.date || parseArchiveDateFromName(b.name)) -
-          new Date(a.date || parseArchiveDateFromName(a.name))
-        );
+        raw.sort((a, b) => new Date(b.date) - new Date(a.date));
         savedArchives = raw.map(a => ({
           name: a.name,
           nativeURL: a.name,
@@ -3139,10 +3209,6 @@
       header.innerText = groupLabel;
       archiveListContainer.appendChild(header);
       
-      groups[key].sort((a, b) =>
-        new Date(b.date) - new Date(a.date)
-      );
-
       groups[key].forEach(archive => {
         const archiveKey = archive.nativeURL || archive.name;
         const item = document.createElement('div');
@@ -3225,7 +3291,7 @@
   });
 
   // C. Отправка / шеринг через cordova-plugin-x-socialsharing
-  function shareFiles(filesArray, subjectText, specificMessage) {
+  function shareFiles(filesArray, subjectText, specificMessage, onSuccess) {
     let finalMessage = specificMessage || "Фотоотчет во вложении";
     if (!specificMessage && filesArray.length === 1) {
       const fileName = String(filesArray[0]).split('/').pop();
@@ -3241,11 +3307,13 @@
             isMultiSelectMode = false;
             renderArchiveList();
           }
+          if (onSuccess) onSuccess();
         },
         function(err) { alert("Ошибка отправки: " + err); }
       );
     } else {
       alert("Готово! Для отправки используйте файловый менеджер.");
+      if (onSuccess) onSuccess();
     }
   }
 
