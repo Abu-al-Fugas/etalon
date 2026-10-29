@@ -681,7 +681,9 @@
     photos: Array.from({ length: mandatoryConfig.length }, () => []), 
     photos2: Array.from({ length: mandatoryConfig.length }, () => []), 
     photos3: Array.from({ length: mandatoryConfig.length }, () => []), 
-    gasPhotos: [], currentActiveIndex: null, currentActiveMeter: 1
+    gasPhotos: [], currentActiveIndex: null, currentActiveMeter: 1,
+    lastSavedSnapshot: null,
+    lastSavedZipName: ''
   };
   let currentZipName = "";
   let currentZipBlob = null;
@@ -930,22 +932,18 @@
 
   function onBackKeyDown(e) {
     if (e) e.preventDefault();
-    // 1. photoModal открыт → closeLightbox()
     if (document.getElementById('photoModal').style.display === 'flex') {
       closeLightbox();
       return;
     }
-    // 2. modelSearchModal открыт → закрыть
     if (document.getElementById('modelSearchModal').style.display === 'flex') {
       document.getElementById('modelSearchModal').style.display = 'none';
       return;
     }
-    // 3. signatureModal открыт → закрыть
     if (document.getElementById('signatureModal').style.display === 'flex') {
       document.getElementById('signatureModal').style.display = 'none';
       return;
     }
-    // 4. Модалки предупреждений / подтверждений → отмена / закрытие
     if (document.getElementById('notSentWarningModal').style.display === 'flex') {
       document.getElementById('notSentWarningModal').style.display = 'none';
       return;
@@ -970,27 +968,22 @@
       document.getElementById('installerNameModal').style.display = 'none';
       return;
     }
-    // 5. archiveScreen активен → backFromArchivesBtn.click()
     if (!archiveScreen.classList.contains('hidden')) {
       document.getElementById('backFromArchivesBtn').click();
       return;
     }
-    // 6. postponedScreen активен → backFromPostponedBtn.click()
     if (!document.getElementById('postponedScreen').classList.contains('hidden')) {
       document.getElementById('backFromPostponedBtn').click();
       return;
     }
-    // 7. inventoryScreen активен → backFromInventoryBtn.click()
     if (!document.getElementById('inventoryScreen').classList.contains('hidden')) {
       document.getElementById('backFromInventoryBtn').click();
       return;
     }
-    // 8. checklistScreen активен → goBackBtn.click()
     if (!checklistScreen.classList.contains('hidden')) {
       document.getElementById('goBackBtn').click();
       return;
     }
-    // 9. иначе → navigator.app.exitApp()
     if (navigator.app && typeof navigator.app.exitApp === 'function') {
       navigator.app.exitApp();
     }
@@ -1083,10 +1076,57 @@
     return 'report_' + dateStr + '_' + timeStr + '_' + rand;
   }
 
+  // Получаем объект параметров для подсчета количества изменений
+  function getParametersSnapshot() {
+    return {
+      cityName: state.cityName || '',
+      objectName: state.objectName || '',
+      address: state.address || '',
+      uirgLocation: state.uirgLocation || '',
+      installerName: state.installerName || '',
+      serialNumber: state.serialNumber || '',
+      meterModel: state.meterModel || '',
+      consumerRole: state.consumerRole || '',
+      consumerName: state.consumerName || '',
+      accountNumber: state.accountNumber || '',
+      powerKw: state.powerKw || '',
+      powerM3: state.powerM3 || '',
+      powerPg: state.powerPg || '',
+      controllerSeal: state.controllerSeal || '',
+      oldMeterModel: state.oldMeterModel || '',
+      oldMeterSerial: state.oldMeterSerial || '',
+      oldMeterReadings: state.oldMeterReadings || '',
+      newGasDirection: state.newGasDirection || '',
+      simCardNumber: state.simCardNumber || '',
+      noOldMeter: Boolean(state.noOldMeter),
+      comment: state.comment || '',
+      oldMeterCount: state.oldMeterCount || 1,
+      oldMeterModel2: state.oldMeterModel2 || '',
+      oldMeterSerial2: state.oldMeterSerial2 || '',
+      oldMeterReadings2: state.oldMeterReadings2 || '',
+      controllerSeal2: state.controllerSeal2 || '',
+      oldMeterModel3: state.oldMeterModel3 || '',
+      oldMeterSerial3: state.oldMeterSerial3 || '',
+      oldMeterReadings3: state.oldMeterReadings3 || '',
+      controllerSeal3: state.controllerSeal3 || ''
+    };
+  }
+
+  function countParameterChanges(oldParams, newParams) {
+    if (!oldParams || !newParams) return 999;
+    let diff = 0;
+    const allKeys = Object.keys(newParams);
+    for (let k of allKeys) {
+      if (oldParams[k] !== newParams[k]) {
+        diff++;
+      }
+    }
+    return diff;
+  }
+
   function saveDraft(isLifecycleEvent) {
     if (!isLifecycleEvent) {
       let statusChanged = false;
-      // Сбрасываем флаги ТОЛЬКО при реальном изменении формы после создания архива
       if (state.archiveFresh) {
         state.archiveFresh = false;
         state.reportShared = false;
@@ -1119,7 +1159,9 @@
       newGasDirection: state.newGasDirection, simCardNumber: state.simCardNumber,
       noOldMeter: state.noOldMeter, comment: state.comment,
       coordinates: state.coordinates, creationDate: state.creationDate, gpsLocked: state.gpsLocked, 
-      photos: state.photos, photos2: state.photos2, photos3: state.photos3, gasPhotos: state.gasPhotos
+      photos: state.photos, photos2: state.photos2, photos3: state.photos3, gasPhotos: state.gasPhotos,
+      lastSavedSnapshot: state.lastSavedSnapshot,
+      lastSavedZipName: state.lastSavedZipName
     };
     const safeSnapshot = JSON.parse(JSON.stringify(draftState));
     db.transaction("drafts", "readwrite").objectStore("drafts").put({ id: "current", data: safeSnapshot });
@@ -1144,6 +1186,8 @@
         state.reportId = d.reportId || '';
         state.sentToFirebase = d.sentToFirebase || false;
         state.reportShared = d.reportShared || false;
+        state.lastSavedSnapshot = d.lastSavedSnapshot || null;
+        state.lastSavedZipName = d.lastSavedZipName || '';
         state.archiveFresh = false;
         refreshActionButtons();
         updateReportStatusBadge();
@@ -1350,7 +1394,6 @@
     });
   }
 
-  // B. Сканирование штрих-кодов через Cordova-плагин
   function startBarcodeScan(onSuccess) {
     if (typeof cordova !== 'undefined' && cordova.plugins && cordova.plugins.barcodeScanner) {
       cordova.plugins.barcodeScanner.scan(
@@ -2233,7 +2276,6 @@
     validateForm();
   }
 
-  // A. Обработка фото через FileReader + Canvas (MAX_SIDE = 1280, JPEG 0.7)
   cameraInput.addEventListener('change', (e) => {
     const files = Array.from(e.target.files), idx = state.currentActiveIndex, m = state.currentActiveMeter || 1; 
     if (files.length === 0 || idx === null) {
@@ -2369,7 +2411,6 @@
     return text;
   }
 
-  // D. Сборка и сохранение ZIP-архива (Cordova File API + fallback на IndexedDB)
   generateBtn.addEventListener('click', async () => {
     if (generateBtn.disabled) return;
     generateBtn.innerText = "⏳ Сборка архива..."; generateBtn.disabled = true;
@@ -2412,18 +2453,39 @@
       let cdLen = centralDir.reduce((a, b) => a + b.length, 0); const eocd = new Uint8Array(22); eocd.set([0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, filesToPack.length & 0xFF, (filesToPack.length >>> 8) & 0xFF, filesToPack.length & 0xFF, (filesToPack.length >>> 8) & 0xFF, cdLen & 0xFF, (cdLen >>> 8) & 0xFF, (cdLen >>> 16) & 0xFF, (cdLen >>> 24) & 0xFF, offset & 0xFF, (offset >>> 8) & 0xFF, (offset >>> 16) & 0xFF, (offset >>> 24) & 0xFF, 0, 0]);
       const finalZipUint8 = new Uint8Array(offset + cdLen + 22); let currentPos = 0; fileData.forEach(part => { finalZipUint8.set(part, currentPos); currentPos += part.length; }); centralDir.forEach(part => { finalZipUint8.set(part, currentPos); currentPos += part.length; }); finalZipUint8.set(eocd, currentPos);
       
-      const d = new Date(state.creationDate);
-      const dateStr = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
-      let sanitizedSerial = state.serialNumber.replace(/[^a-zа-яё0-9]/gi, '_').substring(0, 24);
-      let baseName = `${sanitizedSerial}_${dateStr}`;
-      
-      let finalName = baseName + ".zip";
-      let counter = 2;
-      let existingNames = savedArchives.map(a => a.name);
-      while (existingNames.includes(finalName)) {
-          finalName = `${baseName}_${counter}.zip`;
-          counter++;
+      const currentParams = getParametersSnapshot();
+      let shouldOverwrite = false;
+
+      // Если архив уже создавался и изменено <= 4 параметров — перезаписываем текущий
+      if (state.lastSavedSnapshot && state.lastSavedZipName) {
+        const changesCount = countParameterChanges(state.lastSavedSnapshot, currentParams);
+        if (changesCount <= 4) {
+          shouldOverwrite = true;
+        }
       }
+
+      let finalName = "";
+      if (shouldOverwrite) {
+        finalName = state.lastSavedZipName;
+      } else {
+        const d = new Date(state.creationDate || Date.now());
+        const dateStr = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+        let sanitizedSerial = (state.serialNumber || '00').replace(/[^a-zа-яё0-9]/gi, '_').substring(0, 24);
+        let baseName = `${sanitizedSerial}_${dateStr}`;
+        
+        finalName = baseName + ".zip";
+        let counter = 2;
+        let existingNames = savedArchives.map(a => a.name);
+        while (existingNames.includes(finalName)) {
+            finalName = `${baseName}_${counter}.zip`;
+            counter++;
+        }
+        // Если изменилось более 4 параметров, это фактически новый отдельный отчет
+        if (state.lastSavedSnapshot) {
+          state.reportId = generateReportId();
+        }
+      }
+
       currentZipName = finalName;
       currentZipBlob = new Blob([finalZipUint8], { type: "application/zip" });
 
@@ -2512,13 +2574,21 @@
                 nativeFileUrl = fileEntry.nativeURL;
                 safeSetLocal('meta_' + currentZipName, emailBodyText);
                 
-                // Добавляем в локальный список для предотвращения коллизий
-                savedArchives.unshift({
+                state.lastSavedSnapshot = currentParams;
+                state.lastSavedZipName = currentZipName;
+
+                const exIndex = savedArchives.findIndex(a => a.name === currentZipName);
+                const archObj = {
                   name: currentZipName,
                   nativeURL: fileEntry.nativeURL,
                   entry: fileEntry,
                   date: parseArchiveDateFromName(currentZipName)
-                });
+                };
+                if (exIndex >= 0) {
+                  savedArchives[exIndex] = archObj;
+                } else {
+                  savedArchives.unshift(archObj);
+                }
                 
                 clearDraft();
                 state.archiveFresh = true;
@@ -2535,20 +2605,27 @@
           }, function(e){ alert("Ошибка доступа: " + JSON.stringify(e)); resetGenBtn(); });
         }, function(e){ alert("Ошибка памяти: " + JSON.stringify(e)); resetGenBtn(); });
       } else {
-        // Fallback для браузера: сохранить в IndexedDB
         const base64Data = uint8ToBase64(finalZipUint8);
         safeSetLocal('meta_' + currentZipName, emailBodyText);
         if (db) {
           const tx = db.transaction("archives", "readwrite");
           tx.oncomplete = function() {
-            // Добавляем в локальный список для предотвращения коллизий
-            savedArchives.unshift({
+            state.lastSavedSnapshot = currentParams;
+            state.lastSavedZipName = currentZipName;
+
+            const exIndex = savedArchives.findIndex(a => a.name === currentZipName);
+            const archObj = {
               name: currentZipName,
               nativeURL: currentZipName,
               base64: base64Data,
               text: emailBodyText,
               date: new Date().toISOString()
-            });
+            };
+            if (exIndex >= 0) {
+              savedArchives[exIndex] = archObj;
+            } else {
+              savedArchives.unshift(archObj);
+            }
 
             clearDraft();
             state.archiveFresh = true;
@@ -2591,7 +2668,7 @@
     if (fileTarget) {
       shareFiles([fileTarget], `Счетчик № ${state.serialNumber}`, null, () => {
         state.reportShared = true;
-        saveDraft(true); // сохраняем флаг в IndexedDB без сброса
+        saveDraft(true);
         updateReportStatusBadge();
       });
     } else {
@@ -2640,7 +2717,7 @@
     state.gasPhotos.length = 0;
 
     if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } if (gpsTimeoutId !== null) { clearTimeout(gpsTimeoutId); gpsTimeoutId = null; }
-    state = { archiveFresh: false, reportId: '', sentToFirebase: false, reportShared: false, inventoryOperations: [], currentInventoryOpType: null, cityName: '', objectName: '', address: '', uirgLocation: '', installerName: safeGetLocal('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', signatureDataUrl: '', powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: '', controllerSeal: '', oldMeterCount: 1, oldMeterModel: '', oldMeterSerial: '', oldMeterReadings: '', oldMeterModel2: '', oldMeterSerial2: '', oldMeterReadings2: '', controllerSeal2: '', oldMeterModel3: '', oldMeterSerial3: '', oldMeterReadings3: '', controllerSeal3: '', newGasDirection: '', simCardNumber: '', noOldMeter: false, comment: '', coordinates: null, creationDate: null, gpsLocked: false, photos: Array.from({ length: mandatoryConfig.length }, () => []), photos2: Array.from({ length: mandatoryConfig.length }, () => []), photos3: Array.from({ length: mandatoryConfig.length }, () => []), gasPhotos: [], currentActiveIndex: null, currentActiveMeter: 1 };
+    state = { archiveFresh: false, reportId: '', sentToFirebase: false, reportShared: false, inventoryOperations: [], currentInventoryOpType: null, cityName: '', objectName: '', address: '', uirgLocation: '', installerName: safeGetLocal('installerName') || '', serialNumber: '', meterModel: '', consumerRole: '', consumerName: '', accountNumber: '', signatureDataUrl: '', powerKw: '', powerM3: '', powerPg: '', totalPower: '0.00', suggestedMeter: '', controllerSeal: '', oldMeterCount: 1, oldMeterModel: '', oldMeterSerial: '', oldMeterReadings: '', oldMeterModel2: '', oldMeterSerial2: '', oldMeterReadings2: '', controllerSeal2: '', oldMeterModel3: '', oldMeterSerial3: '', oldMeterReadings3: '', controllerSeal3: '', newGasDirection: '', simCardNumber: '', noOldMeter: false, comment: '', coordinates: null, creationDate: null, gpsLocked: false, photos: Array.from({ length: mandatoryConfig.length }, () => []), photos2: Array.from({ length: mandatoryConfig.length }, () => []), photos3: Array.from({ length: mandatoryConfig.length }, () => []), gasPhotos: [], currentActiveIndex: null, currentActiveMeter: 1, lastSavedSnapshot: null, lastSavedZipName: '' };
     currentZipName = "";
     currentZipBlob = null;
     nativeFileUrl = "";
@@ -3124,7 +3201,6 @@
     return new Date().toISOString();
   }
 
-  // E. Загрузка списка архивов (Cordova dataDirectory в APK + fallback на IndexedDB в браузере)
   function loadArchives() {
     archiveListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: #64748b;">Загрузка архивов...</div>';
     if (typeof cordova !== 'undefined' && cordova.file) {
@@ -3290,7 +3366,6 @@
     renderArchiveList();
   });
 
-  // C. Отправка / шеринг через cordova-plugin-x-socialsharing
   function shareFiles(filesArray, subjectText, specificMessage, onSuccess) {
     let finalMessage = specificMessage || "Фотоотчет во вложении";
     if (!specificMessage && filesArray.length === 1) {
